@@ -54,6 +54,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   const pageLoader = document.getElementById("pageLoader");
   const pageLoaderText = document.getElementById("pageLoaderText");
 
+  const scannerModal = document.getElementById("scannerModal");
+const scannerVideo = document.getElementById("scannerVideo");
+const scannerMessage = document.getElementById("scannerMessage");
+const btnCerrarScanner = document.getElementById("btnCerrarScanner");
+const btnCancelarScanner = document.getElementById("btnCancelarScanner");
+
+let activeScanInput = null;
+let scannerStream = null;
+let scannerDetector = null;
+let scannerAnimationId = null;
+let scannerRunning = false;
+
+
   function addClick(element, handler) {
     if (element) {
       element.addEventListener("click", handler);
@@ -135,6 +148,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     return String(value ?? "").trim().toUpperCase();
   }
 
+function normalizeScanFieldName(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+}
+
+function isScannableField(fieldName) {
+  const name = normalizeScanFieldName(fieldName);
+
+  if (!name) return false;
+
+  if (
+    name.includes("CANT") ||
+    name.includes("CANTIDAD") ||
+    name === "FECHA" ||
+    name === "USUARIO" ||
+    name === "COMENTARIO"
+  ) {
+    return false;
+  }
+
+  return (
+    name === "SKU" ||
+    name === "PEDIDO" ||
+    name === "CLIENTE_GB" ||
+    name.includes("LOTE")
+  );
+}
+
+
   function formatLocalNow() {
     const now = new Date();
 
@@ -162,6 +209,149 @@ document.addEventListener("DOMContentLoaded", async () => {
       toast.className = "toast";
     }, 3500);
   }
+
+function setScannerMessage(message) {
+  if (scannerMessage) {
+    scannerMessage.textContent = message;
+  }
+}
+
+async function createBarcodeDetector() {
+  if (!("BarcodeDetector" in window)) {
+    throw new Error("Este navegador no soporta escaneo nativo de códigos de barras.");
+  }
+
+  const preferredFormats = [
+    "code_128",
+    "code_39",
+    "code_93",
+    "ean_13",
+    "ean_8",
+    "upc_a",
+    "upc_e",
+    "itf",
+    "qr_code"
+  ];
+
+  try {
+    if (typeof BarcodeDetector.getSupportedFormats === "function") {
+      const supported = await BarcodeDetector.getSupportedFormats();
+      const formats = preferredFormats.filter((format) => supported.includes(format));
+
+      if (formats.length) {
+        return new BarcodeDetector({ formats });
+      }
+    }
+  } catch (error) {
+    console.warn("No se pudieron obtener formatos soportados:", error);
+  }
+
+  return new BarcodeDetector();
+}
+
+async function openBarcodeScanner(inputElement) {
+  if (!inputElement) {
+    showToast("No se encontró el campo destino para escanear.", "error");
+    return;
+  }
+
+  activeScanInput = inputElement;
+
+  try {
+    document.body.classList.add("scanner-open");
+
+    scannerModal.classList.add("is-open");
+    scannerModal.setAttribute("aria-hidden", "false");
+
+    setScannerMessage("Solicitando acceso a la cámara...");
+
+    scannerDetector = await createBarcodeDetector();
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("El navegador no permite acceso a cámara.");
+    }
+
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+
+    scannerVideo.srcObject = scannerStream;
+
+    await scannerVideo.play();
+
+    scannerRunning = true;
+    setScannerMessage("Apunte la cámara al código de barras.");
+    scanFrame();
+
+  } catch (error) {
+    console.error("Error iniciando scanner:", error);
+    stopBarcodeScanner();
+    showToast(error.message || "No se pudo iniciar la cámara.", "error");
+  }
+}
+
+async function scanFrame() {
+  if (!scannerRunning || !scannerDetector || !scannerVideo) return;
+
+  try {
+    if (scannerVideo.readyState >= 2) {
+      const codes = await scannerDetector.detect(scannerVideo);
+
+      if (codes && codes.length > 0) {
+        const value = codes[0].rawValue || "";
+
+        if (value && activeScanInput) {
+          activeScanInput.value = value;
+          activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
+          activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+          showToast("Código escaneado correctamente.", "ok");
+          stopBarcodeScanner();
+          return;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Intento de lectura sin resultado:", error);
+  }
+
+  scannerAnimationId = requestAnimationFrame(scanFrame);
+}
+
+function stopBarcodeScanner() {
+  scannerRunning = false;
+
+  if (scannerAnimationId) {
+    cancelAnimationFrame(scannerAnimationId);
+    scannerAnimationId = null;
+  }
+
+  if (scannerVideo) {
+    scannerVideo.pause();
+    scannerVideo.srcObject = null;
+  }
+
+  if (scannerStream) {
+    scannerStream.getTracks().forEach((track) => track.stop());
+    scannerStream = null;
+  }
+
+  scannerDetector = null;
+  activeScanInput = null;
+
+  if (scannerModal) {
+    scannerModal.classList.remove("is-open");
+    scannerModal.setAttribute("aria-hidden", "true");
+  }
+
+  document.body.classList.remove("scanner-open");
+}
+
 
   function showPageLoader(message = "Cargando registros...") {
     if (!pageLoader) return;
@@ -376,26 +566,38 @@ document.addEventListener("DOMContentLoaded", async () => {
           `;
         }
 
-        return `
-          <div class="field">
-            <label for="${id}">${escapeHtml(campo)}</label>
-            <input
-              type="text"
-              id="${id}"
-              class="lote-field"
-              data-name="${escapeHtml(campo)}"
-              value="${
-                isFecha
-                  ? formatLocalNow()
-                  : isUsuario
-                    ? escapeHtml(state.user?.usuario || state.user?.username || "")
-                    : ""
-              }"
-              placeholder="Ingrese ${escapeHtml(campo)}"
-              ${isFecha || isUsuario ? "readonly" : ""}
-            />
-          </div>
-        `;
+const canScan = isScannableField(campo);
+
+return `
+  <div class="field">
+    <label for="${id}">${escapeHtml(campo)}</label>
+
+    <div class="${canScan ? "scan-input-wrap" : ""}">
+      <input
+        type="text"
+        id="${id}"
+        class="lote-field"
+        data-name="${escapeHtml(campo)}"
+        value="${
+          isFecha
+            ? formatLocalNow()
+            : isUsuario
+              ? escapeHtml(state.user?.usuario || state.user?.username || "")
+              : ""
+        }"
+        placeholder="Ingrese ${escapeHtml(campo)}"
+        ${isFecha || isUsuario ? "readonly" : ""}
+      />
+
+      ${
+        canScan
+          ? `<button type="button" class="scan-btn" data-target="${id}">Escanear</button>`
+          : ""
+      }
+    </div>
+  </div>
+`;
+
       })
       .join("");
 
@@ -610,6 +812,21 @@ function apiPostTimed(action, payload, ms = 20000) {
   addClick(btnCerrarModal, closeModal);
   addClick(btnCancelarRegistro, closeModal);
   addClick(btnDescargarExcel, downloadExcelWorkbook);
+
+  addClick(btnCerrarScanner, stopBarcodeScanner);
+addClick(btnCancelarScanner, stopBarcodeScanner);
+
+document.addEventListener("click", (event) => {
+  const scanButton = event.target.closest(".scan-btn");
+
+  if (!scanButton) return;
+
+  const targetId = scanButton.dataset.target;
+  const input = document.getElementById(targetId);
+
+  openBarcodeScanner(input);
+});
+
 
   if (modalRegistro) {
     modalRegistro.addEventListener("click", (event) => {
