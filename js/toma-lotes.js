@@ -34,6 +34,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnBuscar = document.getElementById("btnBuscar");
   const btnLimpiarFiltros = document.getElementById("btnLimpiarFiltros");
   const btnDescargarExcel = document.getElementById("btnDescargarExcel");
+  const btnActualizarRegistros = document.getElementById("btnActualizarRegistros");
+
 
   const btnNuevoRegistro = document.getElementById("btnNuevoRegistro");
   const modalRegistro = document.getElementById("modalRegistro");
@@ -384,6 +386,20 @@ function stopBarcodeScanner() {
     }
   }
 
+function setButtonHtmlLoading(button, loadingHtml, isLoading) {
+  if (!button) return;
+
+  if (isLoading) {
+    button.dataset.originalHtml = button.innerHTML;
+    button.innerHTML = loadingHtml;
+    button.disabled = true;
+  } else {
+    button.innerHTML = button.dataset.originalHtml || button.innerHTML;
+    button.disabled = false;
+  }
+}
+
+
   function fillSelect(select, clientes, firstLabel) {
     if (!select) return;
 
@@ -447,8 +463,57 @@ function stopBarcodeScanner() {
     }
   }
 
+function parseRecordDate(value) {
+  const raw = String(value || "").trim();
+
+  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+
+  if (match) {
+    const [, y, m, d, h, mi, s] = match;
+    return new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(h),
+      Number(mi),
+      Number(s)
+    ).getTime();
+  }
+
+  match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+
+  if (match) {
+    const [, d, m, y, h, mi, s] = match;
+    return new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(h),
+      Number(mi),
+      Number(s)
+    ).getTime();
+  }
+
+  const fallback = Date.parse(raw);
+  return Number.isNaN(fallback) ? 0 : fallback;
+}
+
+function sortRecordsByDateDesc(rows) {
+  return [...rows].sort((a, b) => {
+    const dateDiff = parseRecordDate(b.fecha) - parseRecordDate(a.fecha);
+
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+
+    return String(b.id || "").localeCompare(String(a.id || ""));
+  });
+}
+
+
   function renderRecords(rows) {
-    state.records = Array.isArray(rows) ? rows : [];
+    state.records = Array.isArray(rows) ? sortRecordsByDateDesc(rows) : [];
+
 
     if (!tablaRegistros) return;
 
@@ -808,10 +873,30 @@ function apiPostTimed(action, payload, ms = 20000) {
     });
   }
 
-  addClick(btnNuevoRegistro, openModal);
-  addClick(btnCerrarModal, closeModal);
-  addClick(btnCancelarRegistro, closeModal);
-  addClick(btnDescargarExcel, downloadExcelWorkbook);
+addClick(btnNuevoRegistro, openModal);
+addClick(btnCerrarModal, closeModal);
+addClick(btnCancelarRegistro, closeModal);
+addClick(btnDescargarExcel, downloadExcelWorkbook);
+
+addClick(btnActualizarRegistros, async () => {
+  try {
+    setButtonHtmlLoading(
+      btnActualizarRegistros,
+      `<span class="refresh-icon spin">↻</span><span>Actualizando...</span>`,
+      true
+    );
+
+    await loadRecords("Actualizando...");
+
+    showToast("Registros actualizados correctamente.", "ok");
+  } catch (error) {
+    console.error("Error actualizando registros:", error);
+    showToast(error.message || "No se pudieron actualizar los registros.", "error");
+  } finally {
+    setButtonHtmlLoading(btnActualizarRegistros, "", false);
+  }
+});
+
 
   addClick(btnCerrarScanner, stopBarcodeScanner);
 addClick(btnCancelarScanner, stopBarcodeScanner);
