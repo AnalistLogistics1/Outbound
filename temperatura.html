@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Temperatura</title>
+
+  <link rel="stylesheet" href="./part/cabecera.css">
+  <link rel="stylesheet" href="./part/footer.css">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#072B5C">
+  <link rel="icon" type="image/png" href="./img/logo.png">
+
+  <style>
+    :root {
+      --bg: #eef3f8;
+      --panel: #ffffff;
+      --border: #dbe5ef;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #0f4c81;
+      --primary-2: #2563eb;
+      --success: #15803d;
+      --warning: #f59e0b;
+      --danger: #c62828;
+      --shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+      --radius: 22px;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 18%),
+        linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    .page-wrap {
+      width: 100%;
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 22px 18px 80px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 24px;
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: 1.2fr auto;
+      gap: 18px;
+      align-items: center;
+      background:
+        radial-gradient(circle at 88% 20%, rgba(37, 99, 235, 0.12), transparent 18%),
+        linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .hero-title {
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .hero-text {
+      margin: 0;
+      max-width: 760px;
+      color: #475569;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 14px;
+      padding: 12px 18px;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 14px;
+      transition: 0.2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(15, 76, 129, 0.18);
+    }
+
+    .btn-secondary {
+      background: #eef2f7;
+      color: #0f172a;
+    }
+
+    .status-box {
+      margin-bottom: 18px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+
+    .status-box.info {
+      background: #e8f1ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+
+    .status-box.success {
+      background: #eaf8ee;
+      color: var(--success);
+      border-color: #bbf7d0;
+    }
+
+    .status-box.error {
+      background: #fdecec;
+      color: var(--danger);
+      border-color: #fecaca;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .mini-card {
+      padding: 18px;
+    }
+
+    .mini-card span {
+      display: block;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+    }
+
+    .mini-card strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 30px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .guide-card,
+    .table-card {
+      padding: 22px;
+    }
+
+    .card-title {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .card-text {
+      margin: 0 0 14px;
+      color: #64748b;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .guide-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #334155;
+      line-height: 1.8;
+      font-size: 14px;
+    }
+
+    .guide-list code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: Consolas, monospace;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    th,
+    td {
+      padding: 14px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #64748b;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .badge-alert {
+      background: #fde8e8;
+      color: #b91c1c;
+    }
+
+    .badge-ok {
+      background: #fff2db;
+      color: #b45309;
+    }
+
+    .badge-error {
+      background: #f1f5f9;
+      color: #334155;
+    }
+
+    .empty-note {
+      margin-top: 12px;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1024px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .hero-card {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-actions {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page-wrap {
+        padding: 18px 12px 80px;
+      }
+
+      .grid-4 {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-title {
+        font-size: 24px;
+      }
+    }
+    .result-modal.oculto {
+  display: none;
+}
+
+.result-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10000;
+}
+
+.result-modal-card {
+  width: 100%;
+  max-width: 580px;
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+}
+
+.result-modal-card.is-ok {
+  border-top: 8px solid #16a34a;
+}
+
+.result-modal-card.is-alert {
+  border-top: 8px solid #dc2626;
+}
+
+.result-modal-card.is-empty {
+  border-top: 8px solid #f59e0b;
+}
+
+.result-modal-icon {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.result-modal-card.is-ok .result-modal-icon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.result-modal-card.is-alert .result-modal-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.result-modal-card.is-empty .result-modal-icon {
+  background: #ffedd5;
+  color: #f59e0b;
+}
+
+.result-modal-card h3 {
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 24px;
+  color: #0f172a;
+}
+
+.result-modal-body p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.result-modal-body ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.result-modal-body li {
+  margin-bottom: 14px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #1f2937;
+}
+
+.result-modal-meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.6;
+  color: #111827;
+}
+
+  </style>
+</head>
+<body>
+  <div id="contenedor-cabecera"></div>
+
+  <main class="page-wrap">
+    <section class="card hero-card">
+      <div>
+        <h2 class="hero-title">Control de Temperatura</h2>
+        <p class="hero-text">
+          Importe uno o más archivos Excel, analice la hoja <strong>Data</strong> y registre automáticamente las lecturas del día actual para temperatura y humedad.
+        </p>
+      </div>
+
+      <div class="hero-actions">
+        <input type="file" id="fileInput" multiple accept=".xlsx" hidden>
+        <button id="btnSeleccionar" class="btn btn-primary" type="button">Importar Archivos Excel</button>
+        <a class="btn btn-secondary" href="./Menu-Opciones/menu.html">Volver al menú</a>
+      </div>
+    </section>
+
+    <div id="statusBox" class="status-box info">Esperando archivos.</div>
+
+    <section class="grid-4">
+      <article class="card mini-card">
+        <span>Procesados</span>
+        <strong id="countProcessed">0</strong>
+      </article>
+
+      <article class="card mini-card">
+        <span>Con alerta</span>
+        <strong id="countAlert">0</strong>
+      </article>
+
+      <article class="card mini-card">
+        <span>OK</span>
+        <strong id="countOk">0</strong>
+      </article>
+
+      <article class="card mini-card">
+        <span>Errores</span>
+        <strong id="countError">0</strong>
+      </article>
+    </section>
+
+    <section class="two-col">
+      <article class="card guide-card">
+        <h3 class="card-title">Estructura esperada del Excel</h3>
+        <p class="card-text">Cada archivo debe tener la hoja <strong>Data</strong> y esta estructura mínima:</p>
+        <ul class="guide-list">
+          <li><code>Columna B</code>: Fecha y hora</li>
+          <li><code>Columna C</code>: Temperatura</li>
+          <li><code>Columna D</code>: Humedad</li>
+          <li>Solo se procesan las filas de la <strong>fecha actual</strong></li>
+          <li>Se envía al backend el detalle ya parseado desde el navegador</li>
+        </ul>
+      </article>
+
+      <article class="card guide-card">
+        <h3 class="card-title">Límites actuales</h3>
+        <p class="card-text">Estos son los umbrales que evalúa actualmente el sistema:</p>
+        <ul class="guide-list">
+          <li><strong>Temperatura crítica:</strong> mayor o igual a 35</li>
+          <li><strong>Humedad crítica:</strong> mayor o igual a 75</li>
+          <li>El estado será <strong>ALERTA</strong> si al menos un valor supera el límite</li>
+          <li>El estado será <strong>OK</strong> si no hay excesos</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card table-card">
+      <h3 class="card-title">Resultado de archivos procesados</h3>
+      <p class="card-text">Se mostrará el resumen de cada archivo importado.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>Punto</th>
+              <th>Fecha detectada</th>
+              <th>Temp Max</th>
+              <th>Hum Max</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="resultTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="empty-note">Si un archivo no contiene la hoja <strong>Data</strong> o no tiene filas de hoy, se marcará como error.</div>
+    </section>
+  </main>
+
+  <div id="resultModal" class="result-modal oculto">
+  <div id="resultModalCard" class="result-modal-card">
+    <div id="resultModalIcon" class="result-modal-icon">✓</div>
+    <h3 id="resultModalTitle">Resultado</h3>
+    <div id="resultModalBody" class="result-modal-body"></div>
+    <button id="resultModalBtn" class="btn btn-primary" type="button">Aceptar</button>
+  </div>
+</div>
+
+
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./part/footer.js"></script>
+  <script src="./part/cabecera.js"></script>
+  <script src="./js/xlsx.full.min.js"></script>
+
+  <script>
+document.addEventListener("DOMContentLoaded", () => {
+  requireAuth();
+
+  const counters = {
+    processed: 0,
+    alert: 0,
+    ok: 0,
+    error: 0
+  };
+
+  const fileInput = document.getElementById("fileInput");
+  const btnSeleccionar = document.getElementById("btnSeleccionar");
+  const statusBox = document.getElementById("statusBox");
+  const resultTableBody = document.getElementById("resultTableBody");
+
+  const resultModal = document.getElementById("resultModal");
+  const resultModalCard = document.getElementById("resultModalCard");
+  const resultModalIcon = document.getElementById("resultModalIcon");
+  const resultModalTitle = document.getElementById("resultModalTitle");
+  const resultModalBody = document.getElementById("resultModalBody");
+  const resultModalBtn = document.getElementById("resultModalBtn");
+
+  btnSeleccionar.addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  resultModalBtn.addEventListener("click", closeResultModal);
+
+  resultModal.addEventListener("click", (e) => {
+    if (e.target === resultModal) {
+      closeResultModal();
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeResultModal();
+    }
+  });
+
+  fileInput.addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []);
+
+    resetCounters();
+    resultTableBody.innerHTML = "";
+    closeResultModal();
+
+    const summary = createRunSummary(files.length);
+
+    if (!files.length) {
+      setStatus("Sin archivos para analizar.", "info");
+      showResultModal(
+        "empty",
+        "Sin archivos para analizar",
+        `<p>No se seleccionó ningún archivo para el análisis.</p>`
+      );
+      return;
+    }
+
+    if (typeof XLSX === "undefined") {
+      setStatus("Falta la librería XLSX.", "error");
+      showResultModal(
+        "empty",
+        "Sin archivos para analizar",
+        `<p>No se encontró la librería local <strong>xlsx.full.min.js</strong>.</p>`
+      );
+      return;
+    }
+
+    for (const file of files) {
+      await processFile(file, summary);
+    }
+
+    finalizeRun(summary);
+    fileInput.value = "";
+  });
+
+  function createRunSummary(selectedCount) {
+    return {
+      selectedCount,
+      analyzedCount: 0,
+      alerts: [],
+      oks: [],
+      errors: []
+    };
+  }
+
+  async function processFile(file, summary) {
+    try {
+      setStatus(`Procesando ${file.name}...`, "info");
+
+      const rows = await extractRowsFromExcel(file);
+
+      if (!rows.length) {
+        throw new Error("No se encontraron filas de la fecha actual en la hoja Data.");
+      }
+
+const result = await apiPost("uploadReadings", {
+  token: getToken(),
+  fileName: file.name,
+  pointCode: extractPointCodeFromFileName(file.name),
+  rows
+});
+
+
+      counters.processed += 1;
+      summary.analyzedCount += 1;
+
+      const item = {
+        archivo: result.file_name,
+        punto: result.point_name || result.point_id || "-",
+        fecha: result.fecha_datos,
+        temp: result.temp_max,
+        hum: result.hum_max,
+        hasTempAlert: !!result.has_temp_alert,
+        hasHumAlert: !!result.has_hum_alert
+      };
+
+      if (result.estado === "ALERTA") {
+        counters.alert += 1;
+        summary.alerts.push(item);
+      } else {
+        counters.ok += 1;
+        summary.oks.push(item);
+      }
+
+      renderCounters();
+
+      addResultRow({
+        archivo: item.archivo,
+        punto: item.punto,
+        fecha: item.fecha,
+        temp: item.temp,
+        hum: item.hum,
+        estado: result.estado
+      });
+    } catch (error) {
+      counters.error += 1;
+      renderCounters();
+
+      summary.errors.push({
+        archivo: file.name,
+        mensaje: error.message
+      });
+
+      addResultRow({
+        archivo: file.name,
+        punto: "-",
+        fecha: "-",
+        temp: "-",
+        hum: "-",
+        estado: "ERROR: " + error.message
+      }, true);
+
+      setStatus(`Error en ${file.name}: ${error.message}`, "error");
+    }
+  }
+
+function extractPointCodeFromFileName(fileName) {
+  const match = String(fileName || "").match(/\b(\d{6})\b/);
+  return match ? match[1] : "";
+}
+
+function finalizeRun(summary) {
+  if (summary.selectedCount === 0) {
+    setStatus("Sin archivos para analizar.", "info");
+    showResultModal(
+      "empty",
+      "Sin archivos para analizar",
+      `<p>No se seleccionó ningún archivo para el análisis.</p>`
+    );
+    return;
+  }
+
+  if (summary.alerts.length > 0) {
+    setStatus("Se detectaron anomalías.", "error");
+
+const alertHtml = summary.alerts.map(item => {
+  let detalle = "";
+
+  if (item.hasTempAlert && item.hasHumAlert) {
+    detalle = `
+      Anomalía: Temperatura y Humedad |
+      <strong>Temp Max: ${formatNumber(item.temp)}</strong> |
+      <strong>Hum Max: ${formatNumber(item.hum)}</strong> |
+      Fecha: ${escapeHtml(item.fecha)}
+    `;
+  } else if (item.hasTempAlert) {
+    detalle = `
+      Anomalía: Temperatura |
+      <strong>Temp Max: ${formatNumber(item.temp)}</strong> |
+      Fecha: ${escapeHtml(item.fecha)}
+    `;
+  } else if (item.hasHumAlert) {
+    detalle = `
+      Anomalía: Humedad |
+      <strong>Hum Max: ${formatNumber(item.hum)}</strong> |
+      Fecha: ${escapeHtml(item.fecha)}
+    `;
+  }
+
+  return `
+    <li>
+      <strong>${escapeHtml(item.punto)}</strong> - ${escapeHtml(item.archivo)}
+      <span class="result-modal-meta">
+        ${detalle}
+      </span>
+    </li>
+  `;
+}).join("");
+
+
+    showResultModal(
+      "alert",
+      "Anomalías detectadas",
+      `<p>Se detectaron anomalías en <strong>${summary.alerts.length}</strong> punto(s).</p><ul>${alertHtml}</ul>`
+    );
+    return;
+  }
+
+  if (summary.analyzedCount > 0 && summary.errors.length === 0) {
+    setStatus("Todos los archivos quedaron OK.", "success");
+
+    showResultModal(
+      "ok",
+      "OK general",
+      `
+        <p>Se analizaron <strong>${summary.analyzedCount}</strong> archivo(s) y no se detectaron anomalías.</p>
+        <ul>
+          ${summary.oks.map(item => `
+            <li>
+              <strong>${escapeHtml(item.punto)}</strong> - ${escapeHtml(item.archivo)}
+              <span class="result-modal-meta">
+                Temp Max: ${escapeHtml(item.temp)} |
+                Hum Max: ${escapeHtml(item.hum)} |
+                Fecha: ${escapeHtml(item.fecha)}
+              </span>
+            </li>
+          `).join("")}
+        </ul>
+      `
+    );
+    return;
+  }
+
+  if (summary.errors.length > 0) {
+    setStatus("Se produjeron errores en el análisis.", "error");
+
+    showResultModal(
+      "alert",
+      "Error en análisis",
+      `
+        <p>Los archivos fueron cargados, pero no se pudieron procesar correctamente.</p>
+        <ul>
+          ${summary.errors.map(err => `
+            <li>
+              <strong>${escapeHtml(err.archivo)}</strong>
+              <span class="result-modal-meta">${escapeHtml(err.mensaje)}</span>
+            </li>
+          `).join("")}
+        </ul>
+      `
+    );
+    return;
+  }
+
+  setStatus("Sin archivos para analizar.", "info");
+  showResultModal(
+    "empty",
+    "Sin archivos para analizar",
+    `<p>No hubo archivos válidos para el análisis.</p>`
+  );
+}
+
+  function showResultModal(type, title, bodyHtml) {
+    resultModalCard.className = "result-modal-card";
+    if (type === "ok") {
+      resultModalCard.classList.add("is-ok");
+      resultModalIcon.textContent = "✓";
+    } else if (type === "alert") {
+      resultModalCard.classList.add("is-alert");
+      resultModalIcon.textContent = "!";
+    } else {
+      resultModalCard.classList.add("is-empty");
+      resultModalIcon.textContent = "i";
+    }
+
+    resultModalTitle.textContent = title;
+    resultModalBody.innerHTML = bodyHtml;
+    resultModal.classList.remove("oculto");
+  }
+
+  function closeResultModal() {
+    resultModal.classList.add("oculto");
+  }
+
+async function extractRowsFromExcel(file) {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, {
+    type: "array",
+    cellDates: true
+  });
+
+  const worksheet = workbook.Sheets["Data"];
+
+  if (!worksheet) {
+    throw new Error('El archivo no contiene la hoja "Data".');
+  }
+
+  return extraerFilasDeHoyDesdeWorksheet(worksheet);
+}
+
+function extraerFilasDeHoyDesdeWorksheet(worksheet) {
+  const ref = worksheet["!ref"];
+  if (!ref) return [];
+
+  const range = XLSX.utils.decode_range(ref);
+  const todayKey = toDateKey_(new Date());
+  const rows = [];
+  let encontroHoy = false;
+
+  for (let r = range.e.r; r >= 1; r--) {
+    const rawDate = getCellValue_(worksheet, r, 1); // B
+    const rawTemp = getCellValue_(worksheet, r, 2); // C
+    const rawHum = getCellValue_(worksheet, r, 3);  // D
+
+    const fecha = excelValueToDate(rawDate);
+    const temperatura = toNumber(rawTemp);
+    const humedad = toNumber(rawHum);
+
+    if (!fecha || temperatura === null || humedad === null) continue;
+
+    if (toDateKey_(fecha) === todayKey) {
+      encontroHoy = true;
+      rows.push({
+        fechaHora: formatLocalDateTime(fecha),
+        temperatura,
+        humedad,
+        filaExcel: r + 1
+      });
+    } else if (encontroHoy) {
+      break;
+    }
+  }
+
+  return rows.reverse();
+}
+
+function getCellValue_(worksheet, rowIndex, colIndex) {
+  const addr = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+  const cell = worksheet[addr];
+  return cell ? cell.v : "";
+}
+
+function toDateKey_(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+
+  function extraerFilasDeHoyDesdeElFinal(matrix) {
+    const today = new Date();
+    const rows = [];
+    let encontroHoy = false;
+
+    for (let i = matrix.length - 1; i >= 1; i--) {
+      const row = matrix[i];
+      const fecha = excelValueToDate(row[1]); // B
+      const temperatura = toNumber(row[2]);   // C
+      const humedad = toNumber(row[3]);       // D
+
+      if (!fecha || temperatura === null || humedad === null) continue;
+
+      if (isSameDate(fecha, today)) {
+        encontroHoy = true;
+        rows.push({
+          fechaHora: formatLocalDateTime(fecha),
+          temperatura,
+          humedad,
+          filaExcel: i + 1
+        });
+      } else if (encontroHoy) {
+        break;
+      }
+    }
+
+    return rows.reverse();
+  }
+
+  function excelValueToDate(value) {
+    if (value instanceof Date && !isNaN(value.getTime())) {
+      return value;
+    }
+
+    if (typeof value === "number") {
+      const parsed = XLSX.SSF.parse_date_code(value);
+      if (parsed) {
+        return new Date(
+          parsed.y,
+          parsed.m - 1,
+          parsed.d,
+          parsed.H || 0,
+          parsed.M || 0,
+          Math.floor(parsed.S || 0)
+        );
+      }
+    }
+
+    if (typeof value === "string") {
+      const clean = value.trim();
+
+      const match = clean.match(
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+      );
+
+      if (match) {
+        let [, dd, mm, yyyy, hh = "0", mi = "0", ss = "0"] = match;
+        if (yyyy.length === 2) yyyy = "20" + yyyy;
+
+        const d = new Date(
+          Number(yyyy),
+          Number(mm) - 1,
+          Number(dd),
+          Number(hh),
+          Number(mi),
+          Number(ss)
+        );
+
+        if (!isNaN(d.getTime())) return d;
+      }
+
+      const d2 = new Date(clean);
+      if (!isNaN(d2.getTime())) return d2;
+    }
+
+    return null;
+  }
+
+  function toNumber(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const n = Number(String(value).replace(",", "."));
+    return Number.isNaN(n) ? null : n;
+  }
+
+  function isSameDate(a, b) {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  function formatLocalDateTime(date) {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const mi = String(date.getMinutes()).padStart(2, "0");
+    const ss = String(date.getSeconds()).padStart(2, "0");
+
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+  }
+
+  function setStatus(text, type) {
+    statusBox.textContent = text;
+    statusBox.className = `status-box ${type}`;
+  }
+
+  function resetCounters() {
+    counters.processed = 0;
+    counters.alert = 0;
+    counters.ok = 0;
+    counters.error = 0;
+    renderCounters();
+  }
+
+  function renderCounters() {
+    document.getElementById("countProcessed").textContent = counters.processed;
+    document.getElementById("countAlert").textContent = counters.alert;
+    document.getElementById("countOk").textContent = counters.ok;
+    document.getElementById("countError").textContent = counters.error;
+  }
+
+  function addResultRow(item, isError = false) {
+    const tr = document.createElement("tr");
+
+    appendCell(tr, item.archivo);
+    appendCell(tr, item.punto);
+    appendCell(tr, item.fecha);
+    appendCell(tr, item.temp);
+    appendCell(tr, item.hum);
+
+    const tdEstado = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className =
+      "badge " +
+      (isError ? "badge-error" : item.estado === "ALERTA" ? "badge-alert" : "badge-ok");
+    badge.textContent = item.estado;
+    tdEstado.appendChild(badge);
+    tr.appendChild(tdEstado);
+
+    resultTableBody.appendChild(tr);
+  }
+
+  function appendCell(tr, value) {
+    const td = document.createElement("td");
+    td.textContent = value;
+    tr.appendChild(td);
+  }
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return value;
+  return n.toFixed(2);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, "")
+    .replace(/'/g, "&#039;");
+}
+
+});
+
+</script>
+
+  <script src="./pwa.js"></script>
+</body>
+</html>

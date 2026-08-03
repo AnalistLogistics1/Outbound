@@ -1,0 +1,22 @@
+{
+  "name": "Control de Temperatura",
+  "short_name": "CT",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#072B5C",
+  "description": "Sistema web de control de temperatura y humedad",
+  "icons": [
+    {
+      "src": "./img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

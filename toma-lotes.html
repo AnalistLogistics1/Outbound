@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Toma de Lotes | Sistema Logístico</title>
+
+  <link rel="stylesheet" href="./part/cabecera.css" />
+  <link rel="stylesheet" href="./css/toma-lotes.css" />
+  <link rel="stylesheet" href="./part/footer.css" />
+
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#072B5C" />
+  <link rel="apple-touch-icon" href="./img/logo.png" />
+  <link rel="icon" type="image/png" href="./img/logo.png" />
+</head>
+
+<body>
+  <div id="pageLoader" class="page-loader is-open" aria-hidden="false">
+    <div class="page-loader-card">
+      <div class="page-loader-spinner"></div>
+      <div id="pageLoaderText">Cargando registros...</div>
+    </div>
+  </div>
+
+  <div id="contenedor-cabecera"></div>
+
+  <main class="page">
+    <section class="hero hero-centered">
+      <div>
+        <span class="eyebrow">Módulo logístico</span>
+        <h1>Toma de Lotes</h1>
+        <p>
+          Registre y consulte la toma de lotes por cliente, con almacenamiento separado por grupo priorizado.
+        </p>
+      </div>
+    </section>
+
+    <section class="toolbar">
+      <div class="toolbar-title">
+        <h2>Registros realizados</h2>
+        <p>Tracker consolidado desde LOTES_PRIORIZADOS_1, 2 y 3.</p>
+      </div>
+
+      <div class="toolbar-actions">
+        <button type="button" class="btn btn-excel" id="btnDescargarExcel">
+          <span class="excel-icon">X</span>
+          <span>Exportar</span>
+        </button>
+
+        <button type="button" class="btn btn-primary" id="btnNuevoRegistro">
+          + Nuevo Registro
+        </button>
+      </div>
+    </section>
+
+    <section class="filters-card">
+      <div class="filters-grid">
+        <div class="field">
+          <label for="filtroCliente">Cliente</label>
+          <select id="filtroCliente">
+            <option value="">Todos los clientes</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="filtroEstado">Estado</label>
+          <select id="filtroEstado">
+            <option value="">Todos</option>
+            <option value="REGISTRADO">Registrado</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="filtroFecha">Fecha</label>
+          <input type="date" id="filtroFecha" />
+        </div>
+
+        <div class="filters-actions">
+          <button type="button" class="btn btn-soft" id="btnLimpiarFiltros">
+            Limpiar
+          </button>
+
+          <button type="button" class="btn btn-dark" id="btnBuscar">
+            Buscar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card">
+        <small>Total registros</small>
+        <strong id="statTotal">0</strong>
+      </article>
+
+      <article class="stat-card">
+        <small>Clientes filtrados</small>
+        <strong id="statClientes">0</strong>
+      </article>
+
+      <article class="stat-card">
+        <small>Última actualización</small>
+        <strong id="statActualizado">--</strong>
+      </article>
+    </section>
+
+    <section class="table-card">
+      <div class="table-head">
+        <div>
+          <h3>Tracker de registros</h3>
+          <p>Los datos se guardan en columnas individuales según el grupo del cliente.</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Grupo</th>
+              <th>Usuario</th>
+              <th>Estado</th>
+              <th>Comentario</th>
+              <th>Hoja</th>
+            </tr>
+          </thead>
+
+          <tbody id="tablaRegistros">
+            <tr>
+              <td colspan="8" class="empty">Cargando registros...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="modalRegistro" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <span class="eyebrow">Nuevo registro</span>
+          <h2>Toma de Lotes</h2>
+        </div>
+
+        <button type="button" class="modal-close" id="btnCerrarModal">x</button>
+      </div>
+
+      <form id="formRegistro" class="modal-body">
+        <div class="field">
+          <label for="clienteRegistro">Cliente</label>
+          <select id="clienteRegistro" required>
+            <option value="">Seleccione cliente</option>
+          </select>
+        </div>
+
+        <div id="camposDinamicos" class="dynamic-grid">
+          <div class="hint">Seleccione un cliente para cargar los campos correspondientes.</div>
+        </div>
+
+        <div class="field field-full">
+          <label for="comentarioRegistro">Comentario</label>
+          <textarea id="comentarioRegistro" rows="3" placeholder="Ingrese un comentario opcional"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-soft" id="btnCancelarRegistro">
+            Cancelar
+          </button>
+
+          <button type="submit" class="btn btn-primary" id="btnGuardarRegistro">
+            Guardar Registro
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./part/footer.js"></script>
+  <script src="./part/cabecera.js"></script>
+
+  <script src="./js/xlsx.full.min.js"></script>
+  <script src="./js/toma-lotes.js"></script>
+
+  <script src="./pwa.js"></script>
+</body>
+</html>

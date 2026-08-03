@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menú Principal | Control de Temperatura</title>
+
+  <link rel="stylesheet" href="../part/cabecera.css">
+  <link rel="stylesheet" href="./menu.css">
+  <link rel="stylesheet" href="../part/footer.css">
+
+  <link rel="manifest" href="../manifest.json">
+  <meta name="theme-color" content="#072B5C">
+  <link rel="apple-touch-icon" href="../img/logo.png">
+  <link rel="icon" type="image/png" href="../img/logo.png">
+</head>
+<body>
+  <div id="contenedor-cabecera"></div>
+
+  <main class="contenedor-principal">
+    <section class="hero-panel">
+      <div class="hero-left theme-dia" id="heroLeft">
+        <div class="hero-scene" id="heroScene">☀️</div>
+
+        <div class="hero-tags">
+          <span class="hero-tag">Portal de aplicativos</span>
+          <span class="hero-tag soft" id="heroShift">Buenos días</span>
+        </div>
+
+        <h1 id="mensajeBienvenida">Hola, Usuario.</h1>
+        <p id="mensajeDescripcion">Seleccione el módulo que desea utilizar hoy.</p>
+
+        <div class="hero-mini-cards">
+          <div class="hero-mini-card">
+            <small>Perfil</small>
+            <strong id="heroPerfil">Usuario</strong>
+          </div>
+
+          <div class="hero-mini-card">
+            <small>Aplicativos</small>
+            <strong id="heroTotalApps">0 módulos</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-right theme-dia" id="heroRight">
+        <div class="time-card">
+          <div class="time-card-left">
+            <span class="time-label">Hoy</span>
+            <strong id="heroFechaCorta">Jueves</strong>
+            <small id="heroFechaLarga">09 de julio de 2026</small>
+            <div class="time-scene-mini" id="heroSceneMini">☀️</div>
+          </div>
+
+          <div class="time-card-right">
+            <div class="clock-face">
+              <div class="clock-hand hour-hand" id="hourHand"></div>
+              <div class="clock-hand minute-hand" id="minuteHand"></div>
+              <div class="clock-hand second-hand" id="secondHand"></div>
+              <div class="clock-center"></div>
+            </div>
+          </div>
+
+          <div class="time-card-footer">
+            <div class="digital-time" id="heroHora">--:--:--</div>
+            <div class="time-message" id="heroSaludo">Bienvenido al sistema</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="apps-section">
+      <div class="section-head">
+        <div>
+          <h2>Aplicativos disponibles</h2>
+          <p>Seleccione un módulo para continuar.</p>
+        </div>
+      </div>
+
+      <div id="appsGrid" class="apps-grid"></div>
+    </section>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../part/footer.js"></script>
+  <script src="../part/cabecera.js"></script>
+  <script src="./menu.js"></script>
+  <script src="../pwa.js"></script>
+</body>
+</html>
