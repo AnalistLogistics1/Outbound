@@ -179,6 +179,32 @@
       </form>
     </div>
   </div>
+<div class="scanner-backdrop" id="scannerModal" aria-hidden="true">
+  <div class="scanner-modal">
+    <div class="scanner-head">
+      <div>
+        <span class="eyebrow">Escaneo de código</span>
+        <h2>Escanear código de barras</h2>
+      </div>
+
+      <button type="button" class="scanner-close" id="btnCerrarScanner">x</button>
+    </div>
+
+    <div class="scanner-body">
+      <video id="scannerVideo" class="scanner-video" playsinline muted></video>
+
+      <div class="scanner-message" id="scannerMessage">
+        Apunte la cámara al código de barras.
+      </div>
+
+      <div class="scanner-actions">
+        <button type="button" class="btn btn-soft" id="btnCancelarScanner">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
   <div id="toast" class="toast"></div>
 
