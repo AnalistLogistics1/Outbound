@@ -36,7 +36,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnDescargarExcel = document.getElementById("btnDescargarExcel");
   const btnActualizarRegistros = document.getElementById("btnActualizarRegistros");
 
-
   const btnNuevoRegistro = document.getElementById("btnNuevoRegistro");
   const modalRegistro = document.getElementById("modalRegistro");
   const btnCerrarModal = document.getElementById("btnCerrarModal");
@@ -57,40 +56,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   const pageLoaderText = document.getElementById("pageLoaderText");
 
   const scannerModal = document.getElementById("scannerModal");
-const scannerVideo = document.getElementById("scannerVideo");
-const scannerMessage = document.getElementById("scannerMessage");
-const scannerGuide = document.getElementById("scannerGuide");
-const btnCerrarScanner = document.getElementById("btnCerrarScanner");
-const btnCancelarScanner = document.getElementById("btnCancelarScanner");
+  const scannerMessage = document.getElementById("scannerMessage");
+  const btnCerrarScanner = document.getElementById("btnCerrarScanner");
+  const btnCancelarScanner = document.getElementById("btnCancelarScanner");
 
-const SCAN_REQUIRED_MATCHES = 2;
-const SCAN_MIN_STABLE_MS = 180;
-const SCAN_INTERVAL_MS = 80;
+  let activeScanInput = null;
+  let html5QrCode = null;
+  let scannerRunning = false;
 
-const SCAN_CENTER_ZONE = {
-  left: 0.08,
-  right: 0.92,
-  top: 0.30,
-  bottom: 0.70
-};
+  let lastScanValue = "";
+  let scanMatchCount = 0;
+  let scanFirstSeenAt = 0;
 
-let lastScanValue = "";
-let scanMatchCount = 0;
-let scanFirstSeenAt = 0;
-let scannerTimeoutId = null;
-
-let activeScanInput = null;
-let scannerStream = null;
-let scannerDetector = null;
-let scannerAnimationId = null;
-let scannerRunning = false;
-
-
+  const SCAN_REQUIRED_MATCHES = 2;
+  const SCAN_MIN_STABLE_MS = 180;
 
   function addClick(element, handler) {
     if (element) {
       element.addEventListener("click", handler);
     }
+  }
+
+  function withTimeout(promise, ms = 20000, label = "Operación") {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`${label} excedió el tiempo de espera.`)), ms)
+      )
+    ]);
+  }
+
+  function apiPostTimed(action, payload, ms = 20000) {
+    return withTimeout(apiPost(action, payload), ms, action);
   }
 
   function parseJsonSafe(raw) {
@@ -141,7 +138,7 @@ let scannerRunning = false;
     setUserUI(storedUser);
 
     try {
-      const res = await apiPost("getSesion", { token });
+      const res = await apiPostTimed("getSesion", { token }, 8000);
       const userFromApi = res.user || res.session || null;
 
       if (userFromApi) {
@@ -155,53 +152,51 @@ let scannerRunning = false;
     }
   }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, "")
-    .replace(/'/g, "&#039;");
-}
-
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, """)
+      .replace(/'/g, "&#039;");
+  }
 
   function normalize(value) {
     return String(value ?? "").trim().toUpperCase();
   }
 
-function normalizeScanFieldName(value) {
-  return String(value || "")
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/-/g, "_");
-}
-
-function isScannableField(fieldName) {
-  const name = normalizeScanFieldName(fieldName);
-
-  if (!name) return false;
-
-  if (
-    name.includes("CANT") ||
-    name.includes("CANTIDAD") ||
-    name === "FECHA" ||
-    name === "USUARIO" ||
-    name === "COMENTARIO"
-  ) {
-    return false;
+  function normalizeScanFieldName(value) {
+    return String(value || "")
+      .trim()
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "_")
+      .replace(/-/g, "_");
   }
 
-  return (
-    name === "SKU" ||
-    name === "PEDIDO" ||
-    name === "CLIENTE_GB" ||
-    name.includes("LOTE")
-  );
-}
+  function isScannableField(fieldName) {
+    const name = normalizeScanFieldName(fieldName);
 
+    if (!name) return false;
+
+    if (
+      name.includes("CANT") ||
+      name.includes("CANTIDAD") ||
+      name === "FECHA" ||
+      name === "USUARIO" ||
+      name === "COMENTARIO"
+    ) {
+      return false;
+    }
+
+    return (
+      name === "SKU" ||
+      name === "PEDIDO" ||
+      name === "CLIENTE_GB" ||
+      name.includes("LOTE")
+    );
+  }
 
   function formatLocalNow() {
     const now = new Date();
@@ -231,304 +226,6 @@ function isScannableField(fieldName) {
     }, 3500);
   }
 
-function setScannerMessage(message) {
-  if (scannerMessage) {
-    scannerMessage.textContent = message;
-  }
-}
-
-async function createBarcodeDetector() {
-  if (!("BarcodeDetector" in window)) {
-    throw new Error("Este navegador no soporta escaneo nativo de códigos de barras.");
-  }
-
-  const preferredFormats = [
-    "code_128",
-    "code_39",
-    "code_93",
-    "ean_13",
-    "ean_8",
-    "upc_a",
-    "upc_e",
-    "itf",
-    "qr_code"
-  ];
-
-  try {
-    if (typeof BarcodeDetector.getSupportedFormats === "function") {
-      const supported = await BarcodeDetector.getSupportedFormats();
-      const formats = preferredFormats.filter((format) => supported.includes(format));
-
-      if (formats.length) {
-        return new BarcodeDetector({ formats });
-      }
-    }
-  } catch (error) {
-    console.warn("No se pudieron obtener formatos soportados:", error);
-  }
-
-  return new BarcodeDetector();
-}
-
-async function optimizeCameraTrack(stream) {
-  try {
-    const track = stream.getVideoTracks()[0];
-
-    if (!track) return;
-
-    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-    const constraints = {
-      advanced: []
-    };
-
-    if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
-      constraints.advanced.push({
-        focusMode: "continuous"
-      });
-    }
-
-    if (capabilities.zoom) {
-      const preferredZoom = Math.min(
-        capabilities.zoom.max,
-        Math.max(capabilities.zoom.min, 1.5)
-      );
-
-      constraints.advanced.push({
-        zoom: preferredZoom
-      });
-    }
-
-    if (constraints.advanced.length) {
-      await track.applyConstraints(constraints);
-    }
-  } catch (error) {
-    console.warn("No se pudieron aplicar mejoras de cámara:", error);
-  }
-}
-
-
-function resetScanStability() {
-  lastScanValue = "";
-  scanMatchCount = 0;
-  scanFirstSeenAt = 0;
-}
-
-function isBarcodeInsideGuide(code) {
-  if (!code || !code.boundingBox || !scannerVideo) return true;
-
-  const videoWidth = scannerVideo.videoWidth || 0;
-  const videoHeight = scannerVideo.videoHeight || 0;
-
-  if (!videoWidth || !videoHeight) return true;
-
-  const box = code.boundingBox;
-
-  const centerX = (box.x + box.width / 2) / videoWidth;
-  const centerY = (box.y + box.height / 2) / videoHeight;
-
-  return (
-    centerX >= SCAN_CENTER_ZONE.left &&
-    centerX <= SCAN_CENTER_ZONE.right &&
-    centerY >= SCAN_CENTER_ZONE.top &&
-    centerY <= SCAN_CENTER_ZONE.bottom
-  );
-}
-
-
-function shouldAcceptStableScan(value) {
-  const now = Date.now();
-
-  if (!value) {
-    resetScanStability();
-    return false;
-  }
-
-  if (value !== lastScanValue) {
-    lastScanValue = value;
-    scanMatchCount = 1;
-    scanFirstSeenAt = now;
-    return false;
-  }
-
-  scanMatchCount++;
-
-  const stableTime = now - scanFirstSeenAt;
-
-  return (
-    scanMatchCount >= SCAN_REQUIRED_MATCHES &&
-    stableTime >= SCAN_MIN_STABLE_MS
-  );
-}
-
-
-async function openBarcodeScanner(inputElement) {
-  if (!inputElement) {
-    showToast("No se encontró el campo destino para escanear.", "error");
-    return;
-  }
-
-  activeScanInput = inputElement;
-  resetScanStability();
-
-  try {
-    document.body.classList.add("scanner-open");
-
-    scannerModal.classList.add("is-open");
-    scannerModal.setAttribute("aria-hidden", "false");
-
-    setScannerMessage("Solicitando acceso a la cámara...");
-
-    scannerDetector = await createBarcodeDetector();
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error("El navegador no permite acceso a cámara.");
-    }
-
-    scannerStream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    });
-
-    await optimizeCameraTrack(scannerStream);
-
-    scannerVideo.srcObject = scannerStream;
-    await scannerVideo.play();
-
-    scannerRunning = true;
-
-    setScannerMessage("Centre el código dentro del recuadro verde.");
-    scanFrame();
-
-  } catch (error) {
-    console.error("Error iniciando scanner:", error);
-    stopBarcodeScanner();
-    showToast(error.message || "No se pudo iniciar la cámara.", "error");
-  }
-}
-
-function getBestCenteredCode(codes) {
-  if (!codes || !codes.length || !scannerVideo) return null;
-
-  const videoWidth = scannerVideo.videoWidth || 0;
-  const videoHeight = scannerVideo.videoHeight || 0;
-
-  if (!videoWidth || !videoHeight) {
-    return codes[0] || null;
-  }
-
-  const centerVideoX = videoWidth / 2;
-  const centerVideoY = videoHeight / 2;
-
-  const candidates = codes
-    .filter((code) => code.rawValue && isBarcodeInsideGuide(code))
-    .map((code) => {
-      const box = code.boundingBox || {};
-      const codeCenterX = box.x + box.width / 2;
-      const codeCenterY = box.y + box.height / 2;
-
-      const distance = Math.sqrt(
-        Math.pow(codeCenterX - centerVideoX, 2) +
-        Math.pow(codeCenterY - centerVideoY, 2)
-      );
-
-      return {
-        code,
-        distance
-      };
-    })
-    .sort((a, b) => a.distance - b.distance);
-
-  return candidates.length ? candidates[0].code : null;
-}
-
-
-async function scanFrame() {
-  if (!scannerRunning || !scannerDetector || !scannerVideo) return;
-
-  try {
-    if (scannerVideo.readyState >= 2) {
-      const codes = await scannerDetector.detect(scannerVideo);
-
-      if (codes && codes.length > 0) {
-        const bestCode = getBestCenteredCode(codes);
-
-        if (!bestCode) {
-          resetScanStability();
-          setScannerMessage("Centre el código dentro del recuadro verde.");
-          scannerTimeoutId = window.setTimeout(scanFrame, SCAN_INTERVAL_MS);
-          return;
-        }
-
-        const value = String(bestCode.rawValue || "").trim();
-
-        if (shouldAcceptStableScan(value)) {
-          if (activeScanInput) {
-            activeScanInput.value = value;
-            activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
-            activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
-
-            showToast("Código escaneado correctamente.", "ok");
-            stopBarcodeScanner();
-            return;
-          }
-        } else {
-          setScannerMessage("Mantenga el código centrado un momento...");
-        }
-      } else {
-        resetScanStability();
-        setScannerMessage("Apunte la cámara al código de barras.");
-      }
-    }
-  } catch (error) {
-    console.warn("Lectura en proceso:", error);
-  }
-
-  scannerTimeoutId = window.setTimeout(scanFrame, SCAN_INTERVAL_MS);
-}
-
-
-
-
-function stopBarcodeScanner() {
-  scannerRunning = false;
-
-  if (scannerTimeoutId) {
-    clearTimeout(scannerTimeoutId);
-    scannerTimeoutId = null;
-  }
-
-  if (scannerAnimationId) {
-    cancelAnimationFrame(scannerAnimationId);
-    scannerAnimationId = null;
-  }
-
-  if (scannerVideo) {
-    scannerVideo.pause();
-    scannerVideo.srcObject = null;
-  }
-
-  if (scannerStream) {
-    scannerStream.getTracks().forEach((track) => track.stop());
-    scannerStream = null;
-  }
-
-  scannerDetector = null;
-  activeScanInput = null;
-  resetScanStability();
-
-  if (scannerModal) {
-    scannerModal.classList.remove("is-open");
-    scannerModal.setAttribute("aria-hidden", "true");
-  }
-
-  document.body.classList.remove("scanner-open");
-}
-
-
   function showPageLoader(message = "Cargando registros...") {
     if (!pageLoader) return;
 
@@ -547,6 +244,226 @@ function stopBarcodeScanner() {
     pageLoader.setAttribute("aria-hidden", "true");
   }
 
+  function setScannerMessage(message) {
+    if (scannerMessage) {
+      scannerMessage.textContent = message;
+    }
+  }
+
+  function resetScanStability() {
+    lastScanValue = "";
+    scanMatchCount = 0;
+    scanFirstSeenAt = 0;
+  }
+
+  function shouldAcceptStableScan(value) {
+    const now = Date.now();
+
+    if (!value) {
+      resetScanStability();
+      return false;
+    }
+
+    if (value !== lastScanValue) {
+      lastScanValue = value;
+      scanMatchCount = 1;
+      scanFirstSeenAt = now;
+      return false;
+    }
+
+    scanMatchCount++;
+
+    return (
+      scanMatchCount >= SCAN_REQUIRED_MATCHES &&
+      now - scanFirstSeenAt >= SCAN_MIN_STABLE_MS
+    );
+  }
+
+  function playScanBeep() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioContext();
+
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.value = 880;
+
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.15);
+    } catch (error) {
+      console.warn("No se pudo reproducir sonido de escaneo:", error);
+    }
+  }
+
+  function getHtml5QrFormats() {
+    if (!window.Html5QrcodeSupportedFormats) return undefined;
+
+    const F = window.Html5QrcodeSupportedFormats;
+
+    return [
+      F.CODE_128,
+      F.CODE_39,
+      F.CODE_93,
+      F.EAN_13,
+      F.EAN_8,
+      F.UPC_A,
+      F.UPC_E,
+      F.ITF,
+      F.QR_CODE
+    ].filter((item) => item !== undefined && item !== null);
+  }
+
+  async function openBarcodeScanner(inputElement) {
+    if (!inputElement) {
+      showToast("No se encontró el campo destino para escanear.", "error");
+      return;
+    }
+
+    if (!window.Html5Qrcode) {
+      showToast("No se encontró html5-qrcode.min.js. Verifique que esté cargado.", "error");
+      return;
+    }
+
+    if (!scannerModal) {
+      showToast("No se encontró el modal de escaneo.", "error");
+      return;
+    }
+
+    activeScanInput = inputElement;
+    resetScanStability();
+
+    try {
+      document.body.classList.add("scanner-open");
+
+      scannerModal.classList.add("is-open");
+      scannerModal.setAttribute("aria-hidden", "false");
+
+      const scannerBox = scannerModal.querySelector(".scanner-modal");
+      scannerBox?.classList.remove("is-captured");
+
+      setScannerMessage("Solicitando acceso a la cámara...");
+
+      if (html5QrCode) {
+        try {
+          await html5QrCode.stop();
+          await html5QrCode.clear();
+        } catch (error) {
+          console.warn("Scanner previo no activo:", error);
+        }
+      }
+
+      const reader = document.getElementById("html5QrReader");
+      if (reader) {
+        reader.innerHTML = "";
+      }
+
+      const formats = getHtml5QrFormats();
+      const constructorConfig = formats && formats.length
+        ? { formatsToSupport: formats }
+        : undefined;
+
+      html5QrCode = constructorConfig
+        ? new Html5Qrcode("html5QrReader", constructorConfig)
+        : new Html5Qrcode("html5QrReader");
+
+      const config = {
+        fps: 15,
+        aspectRatio: 1.777,
+        disableFlip: false,
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          const width = Math.floor(viewfinderWidth * 0.9);
+          const height = Math.max(90, Math.floor(viewfinderHeight * 0.24));
+
+          return {
+            width,
+            height
+          };
+        }
+      };
+
+      scannerRunning = true;
+
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        async function onScanSuccess(decodedText) {
+          if (!scannerRunning) return;
+
+          const value = String(decodedText || "").trim();
+
+          if (!shouldAcceptStableScan(value)) {
+            setScannerMessage("Mantenga el código dentro del recuadro...");
+            return;
+          }
+
+          if (activeScanInput) {
+            activeScanInput.value = value;
+            activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
+            activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+
+          scannerBox?.classList.add("is-captured");
+          playScanBeep();
+
+          setScannerMessage("Código capturado correctamente.");
+
+          window.setTimeout(() => {
+            showToast("Código escaneado correctamente.", "ok");
+            stopBarcodeScanner();
+          }, 250);
+        },
+        function onScanFailure() {
+          if (scannerRunning) {
+            setScannerMessage("Centre el código dentro del recuadro.");
+          }
+        }
+      );
+
+      setScannerMessage("Centre el código dentro del recuadro.");
+    } catch (error) {
+      console.error("Error iniciando scanner:", error);
+      await stopBarcodeScanner();
+      showToast(error.message || "No se pudo iniciar la cámara.", "error");
+    }
+  }
+
+  async function stopBarcodeScanner() {
+    scannerRunning = false;
+
+    try {
+      if (html5QrCode) {
+        const stateScanner = html5QrCode.getState ? html5QrCode.getState() : null;
+
+        if (stateScanner !== 1) {
+          await html5QrCode.stop();
+        }
+
+        await html5QrCode.clear();
+      }
+    } catch (error) {
+      console.warn("No se pudo detener completamente el scanner:", error);
+    }
+
+    html5QrCode = null;
+    activeScanInput = null;
+    resetScanStability();
+
+    if (scannerModal) {
+      scannerModal.classList.remove("is-open");
+      scannerModal.setAttribute("aria-hidden", "true");
+    }
+
+    document.body.classList.remove("scanner-open");
+  }
+
   function setButtonLoading(button, loadingText, isLoading) {
     if (!button) return;
 
@@ -560,19 +477,18 @@ function stopBarcodeScanner() {
     }
   }
 
-function setButtonHtmlLoading(button, loadingHtml, isLoading) {
-  if (!button) return;
+  function setButtonHtmlLoading(button, loadingHtml, isLoading) {
+    if (!button) return;
 
-  if (isLoading) {
-    button.dataset.originalHtml = button.innerHTML;
-    button.innerHTML = loadingHtml;
-    button.disabled = true;
-  } else {
-    button.innerHTML = button.dataset.originalHtml || button.innerHTML;
-    button.disabled = false;
+    if (isLoading) {
+      button.dataset.originalHtml = button.innerHTML;
+      button.innerHTML = loadingHtml;
+      button.disabled = true;
+    } else {
+      button.innerHTML = button.dataset.originalHtml || button.innerHTML;
+      button.disabled = false;
+    }
   }
-}
-
 
   function fillSelect(select, clientes, firstLabel) {
     if (!select) return;
@@ -588,7 +504,7 @@ function setButtonHtmlLoading(button, loadingHtml, isLoading) {
   }
 
   async function loadMeta() {
-    const meta = await apiPost("getLotesMeta", { token });
+    const meta = await apiPostTimed("getLotesMeta", { token }, 12000);
 
     state.meta = {
       clientes: meta.clientes || [],
@@ -612,12 +528,12 @@ function setButtonHtmlLoading(button, loadingHtml, isLoading) {
         `;
       }
 
-      const res = await apiPost("listLoteRecords", {
+      const res = await apiPostTimed("listLoteRecords", {
         token,
         cliente: filtroCliente ? filtroCliente.value : "",
         estado: filtroEstado ? filtroEstado.value : "",
         fecha: filtroFecha ? filtroFecha.value : ""
-      });
+      }, 20000);
 
       renderRecords(res.rows || []);
     } finally {
@@ -632,62 +548,47 @@ function setButtonHtmlLoading(button, loadingHtml, isLoading) {
 
     if (statTotal) statTotal.textContent = String(state.records.length);
     if (statClientes) statClientes.textContent = String(clientesUnicos.size);
+
     if (statActualizado) {
       statActualizado.textContent = new Date().toLocaleTimeString("es-PE");
     }
   }
 
-function parseRecordDate(value) {
-  const raw = String(value || "").trim();
+  function parseRecordDate(value) {
+    const raw = String(value || "").trim();
 
-  let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+    let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
 
-  if (match) {
-    const [, y, m, d, h, mi, s] = match;
-    return new Date(
-      Number(y),
-      Number(m) - 1,
-      Number(d),
-      Number(h),
-      Number(mi),
-      Number(s)
-    ).getTime();
-  }
-
-  match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-
-  if (match) {
-    const [, d, m, y, h, mi, s] = match;
-    return new Date(
-      Number(y),
-      Number(m) - 1,
-      Number(d),
-      Number(h),
-      Number(mi),
-      Number(s)
-    ).getTime();
-  }
-
-  const fallback = Date.parse(raw);
-  return Number.isNaN(fallback) ? 0 : fallback;
-}
-
-function sortRecordsByDateDesc(rows) {
-  return [...rows].sort((a, b) => {
-    const dateDiff = parseRecordDate(b.fecha) - parseRecordDate(a.fecha);
-
-    if (dateDiff !== 0) {
-      return dateDiff;
+    if (match) {
+      const [, y, m, d, h, mi, s] = match;
+      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
     }
 
-    return String(b.id || "").localeCompare(String(a.id || ""));
-  });
-}
+    match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
 
+    if (match) {
+      const [, d, m, y, h, mi, s] = match;
+      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
+    }
+
+    const fallback = Date.parse(raw);
+    return Number.isNaN(fallback) ? 0 : fallback;
+  }
+
+  function sortRecordsByDateDesc(rows) {
+    return [...rows].sort((a, b) => {
+      const dateDiff = parseRecordDate(b.fecha) - parseRecordDate(a.fecha);
+
+      if (dateDiff !== 0) {
+        return dateDiff;
+      }
+
+      return String(b.id || "").localeCompare(String(a.id || ""));
+    });
+  }
 
   function renderRecords(rows) {
     state.records = Array.isArray(rows) ? sortRecordsByDateDesc(rows) : [];
-
 
     if (!tablaRegistros) return;
 
@@ -789,6 +690,7 @@ function sortRecordsByDateDesc(rows) {
         const isFecha = campoNorm === "FECHA";
         const isUsuario = campoNorm === "USUARIO";
         const isComentario = campoNorm === "COMENTARIO";
+        const canScan = isScannableField(campo);
 
         if (isComentario) {
           return `
@@ -805,38 +707,35 @@ function sortRecordsByDateDesc(rows) {
           `;
         }
 
-const canScan = isScannableField(campo);
+        return `
+          <div class="field">
+            <label for="${id}">${escapeHtml(campo)}</label>
 
-return `
-  <div class="field">
-    <label for="${id}">${escapeHtml(campo)}</label>
+            <div class="${canScan ? "scan-input-wrap" : ""}">
+              <input
+                type="text"
+                id="${id}"
+                class="lote-field"
+                data-name="${escapeHtml(campo)}"
+                value="${
+                  isFecha
+                    ? formatLocalNow()
+                    : isUsuario
+                      ? escapeHtml(state.user?.usuario || state.user?.username || "")
+                      : ""
+                }"
+                placeholder="Ingrese ${escapeHtml(campo)}"
+                ${isFecha || isUsuario ? "readonly" : ""}
+              />
 
-    <div class="${canScan ? "scan-input-wrap" : ""}">
-      <input
-        type="text"
-        id="${id}"
-        class="lote-field"
-        data-name="${escapeHtml(campo)}"
-        value="${
-          isFecha
-            ? formatLocalNow()
-            : isUsuario
-              ? escapeHtml(state.user?.usuario || state.user?.username || "")
-              : ""
-        }"
-        placeholder="Ingrese ${escapeHtml(campo)}"
-        ${isFecha || isUsuario ? "readonly" : ""}
-      />
-
-      ${
-        canScan
-          ? `<button type="button" class="scan-btn" data-target="${id}">Escanear</button>`
-          : ""
-      }
-    </div>
-  </div>
-`;
-
+              ${
+                canScan
+                  ? `<button type="button" class="scan-btn" data-target="${id}">Escanear</button>`
+                  : ""
+              }
+            </div>
+          </div>
+        `;
       })
       .join("");
 
@@ -889,12 +788,12 @@ return `
     try {
       setButtonLoading(btnGuardarRegistro, "Guardando...", true);
 
-      const res = await apiPost("createLoteRecord", {
+      const res = await apiPostTimed("createLoteRecord", {
         token,
         cliente,
         campos,
         comentario: comentarioRegistro ? comentarioRegistro.value.trim() : ""
-      });
+      }, 20000);
 
       showToast(`Registro ${res.id} guardado correctamente en ${res.sheetName}.`, "ok");
 
@@ -965,37 +864,23 @@ return `
     ];
   }
 
-function applyWorksheetWidths(ws, headers) {
-  ws["!cols"] = headers.map((header) => {
-    const width = Math.max(12, String(header).length + 2);
-    return { wch: Math.min(width, 30) };
-  });
-}
+  function applyWorksheetWidths(ws, headers) {
+    ws["!cols"] = headers.map((header) => {
+      const width = Math.max(12, String(header).length + 2);
+      return { wch: Math.min(width, 30) };
+    });
+  }
 
-function applyAutoFilter(ws, headers, rowCount) {
-  if (!headers.length) return;
+  function applyAutoFilter(ws, headers, rowCount) {
+    if (!headers.length) return;
 
-  const lastColLetter = XLSX.utils.encode_col(headers.length - 1);
-  const lastRowNumber = Math.max(1, rowCount);
+    const lastColLetter = XLSX.utils.encode_col(headers.length - 1);
+    const lastRowNumber = Math.max(1, rowCount);
 
-  ws["!autofilter"] = {
-    ref: `A1:${lastColLetter}${lastRowNumber}`
-  };
-}
-
-function withTimeout(promise, ms = 20000, label = "Operación") {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} excedió el tiempo de espera.`)), ms)
-    )
-  ]);
-}
-
-function apiPostTimed(action, payload, ms = 20000) {
-  return withTimeout(apiPost(action, payload), ms, action);
-}
-
+    ws["!autofilter"] = {
+      ref: `A1:${lastColLetter}${lastRowNumber}`
+    };
+  }
 
   function downloadExcelWorkbook() {
     if (typeof XLSX === "undefined") {
@@ -1047,45 +932,42 @@ function apiPostTimed(action, payload, ms = 20000) {
     });
   }
 
-addClick(btnNuevoRegistro, openModal);
-addClick(btnCerrarModal, closeModal);
-addClick(btnCancelarRegistro, closeModal);
-addClick(btnDescargarExcel, downloadExcelWorkbook);
-
-addClick(btnActualizarRegistros, async () => {
-  try {
-    setButtonHtmlLoading(
-      btnActualizarRegistros,
-      `<span class="refresh-icon spin">↻</span><span>Actualizando...</span>`,
-      true
-    );
-
-    await loadRecords("Actualizando...");
-
-    showToast("Registros actualizados correctamente.", "ok");
-  } catch (error) {
-    console.error("Error actualizando registros:", error);
-    showToast(error.message || "No se pudieron actualizar los registros.", "error");
-  } finally {
-    setButtonHtmlLoading(btnActualizarRegistros, "", false);
-  }
-});
-
-
+  addClick(btnNuevoRegistro, openModal);
+  addClick(btnCerrarModal, closeModal);
+  addClick(btnCancelarRegistro, closeModal);
+  addClick(btnDescargarExcel, downloadExcelWorkbook);
   addClick(btnCerrarScanner, stopBarcodeScanner);
-addClick(btnCancelarScanner, stopBarcodeScanner);
+  addClick(btnCancelarScanner, stopBarcodeScanner);
 
-document.addEventListener("click", (event) => {
-  const scanButton = event.target.closest(".scan-btn");
+  addClick(btnActualizarRegistros, async () => {
+    try {
+      setButtonHtmlLoading(
+        btnActualizarRegistros,
+        `<span class="refresh-icon spin">↻</span><span>Actualizando...</span>`,
+        true
+      );
 
-  if (!scanButton) return;
+      await loadRecords("Actualizando...");
 
-  const targetId = scanButton.dataset.target;
-  const input = document.getElementById(targetId);
+      showToast("Registros actualizados correctamente.", "ok");
+    } catch (error) {
+      console.error("Error actualizando registros:", error);
+      showToast(error.message || "No se pudieron actualizar los registros.", "error");
+    } finally {
+      setButtonHtmlLoading(btnActualizarRegistros, "", false);
+    }
+  });
 
-  openBarcodeScanner(input);
-});
+  document.addEventListener("click", (event) => {
+    const scanButton = event.target.closest(".scan-btn");
 
+    if (!scanButton) return;
+
+    const targetId = scanButton.dataset.target;
+    const input = document.getElementById(targetId);
+
+    openBarcodeScanner(input);
+  });
 
   if (modalRegistro) {
     modalRegistro.addEventListener("click", (event) => {
@@ -1159,7 +1041,7 @@ document.addEventListener("click", (event) => {
         </tr>
       `;
     }
-
+  } finally {
     hidePageLoader();
   }
 });
