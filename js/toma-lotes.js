@@ -61,15 +61,15 @@ const scannerVideo = document.getElementById("scannerVideo");
 const scannerMessage = document.getElementById("scannerMessage");
 const scannerGuide = document.getElementById("scannerGuide");
 
-const SCAN_REQUIRED_MATCHES = 1;
-const SCAN_MIN_STABLE_MS = 150;
-const SCAN_INTERVAL_MS = 90;
+const SCAN_REQUIRED_MATCHES = 2;
+const SCAN_MIN_STABLE_MS = 180;
+const SCAN_INTERVAL_MS = 80;
 
-const SCAN_ROI = {
-  x: 0.08,
-  y: 0.32,
-  w: 0.84,
-  h: 0.36
+const SCAN_CENTER_ZONE = {
+  left: 0.08,
+  right: 0.92,
+  top: 0.30,
+  bottom: 0.70
 };
 
 let lastScanValue = "";
@@ -77,10 +77,11 @@ let scanMatchCount = 0;
 let scanFirstSeenAt = 0;
 let scannerTimeoutId = null;
 
-const scannerCanvas = document.createElement("canvas");
-const scannerCanvasCtx = scannerCanvas.getContext("2d", {
-  willReadFrequently: true
-});
+
+let lastScanValue = "";
+let scanMatchCount = 0;
+let scanFirstSeenAt = 0;
+let scannerTimeoutId = null;
 
 
 const btnCerrarScanner = document.getElementById("btnCerrarScanner");
@@ -331,18 +332,14 @@ function isBarcodeInsideGuide(code) {
   const centerX = (box.x + box.width / 2) / videoWidth;
   const centerY = (box.y + box.height / 2) / videoHeight;
 
-  const guideLeft = 0.11;
-  const guideRight = 0.89;
-  const guideTop = 0.34;
-  const guideBottom = 0.66;
-
   return (
-    centerX >= guideLeft &&
-    centerX <= guideRight &&
-    centerY >= guideTop &&
-    centerY <= guideBottom
+    centerX >= SCAN_CENTER_ZONE.left &&
+    centerX <= SCAN_CENTER_ZONE.right &&
+    centerY >= SCAN_CENTER_ZONE.top &&
+    centerY <= SCAN_CENTER_ZONE.bottom
   );
 }
+
 
 function shouldAcceptStableScan(value) {
   const now = Date.now();
@@ -419,61 +416,77 @@ async function openBarcodeScanner(inputElement) {
   }
 }
 
+function getBestCenteredCode(codes) {
+  if (!codes || !codes.length || !scannerVideo) return null;
+
+  const videoWidth = scannerVideo.videoWidth || 0;
+  const videoHeight = scannerVideo.videoHeight || 0;
+
+  if (!videoWidth || !videoHeight) {
+    return codes[0] || null;
+  }
+
+  const centerVideoX = videoWidth / 2;
+  const centerVideoY = videoHeight / 2;
+
+  const candidates = codes
+    .filter((code) => code.rawValue && isBarcodeInsideGuide(code))
+    .map((code) => {
+      const box = code.boundingBox || {};
+      const codeCenterX = box.x + box.width / 2;
+      const codeCenterY = box.y + box.height / 2;
+
+      const distance = Math.sqrt(
+        Math.pow(codeCenterX - centerVideoX, 2) +
+        Math.pow(codeCenterY - centerVideoY, 2)
+      );
+
+      return {
+        code,
+        distance
+      };
+    })
+    .sort((a, b) => a.distance - b.distance);
+
+  return candidates.length ? candidates[0].code : null;
+}
+
 
 async function scanFrame() {
   if (!scannerRunning || !scannerDetector || !scannerVideo) return;
 
   try {
     if (scannerVideo.readyState >= 2) {
-      const videoWidth = scannerVideo.videoWidth;
-      const videoHeight = scannerVideo.videoHeight;
+      const codes = await scannerDetector.detect(scannerVideo);
 
-      if (videoWidth && videoHeight) {
-        const sx = Math.floor(videoWidth * SCAN_ROI.x);
-        const sy = Math.floor(videoHeight * SCAN_ROI.y);
-        const sw = Math.floor(videoWidth * SCAN_ROI.w);
-        const sh = Math.floor(videoHeight * SCAN_ROI.h);
+      if (codes && codes.length > 0) {
+        const bestCode = getBestCenteredCode(codes);
 
-        scannerCanvas.width = sw;
-        scannerCanvas.height = sh;
-
-        scannerCanvasCtx.drawImage(
-          scannerVideo,
-          sx,
-          sy,
-          sw,
-          sh,
-          0,
-          0,
-          sw,
-          sh
-        );
-
-        const codes = await scannerDetector.detect(scannerCanvas);
-
-        if (codes && codes.length === 1) {
-          const value = String(codes[0].rawValue || "").trim();
-
-          if (shouldAcceptStableScan(value)) {
-            if (activeScanInput) {
-              activeScanInput.value = value;
-              activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
-              activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
-
-              showToast("Código escaneado correctamente.", "ok");
-              stopBarcodeScanner();
-              return;
-            }
-          } else {
-            setScannerMessage("Mantenga el código centrado por un momento...");
-          }
-        } else if (codes && codes.length > 1) {
-          resetScanStability();
-          setScannerMessage("Hay varios códigos dentro del recuadro. Centre solo uno.");
-        } else {
+        if (!bestCode) {
           resetScanStability();
           setScannerMessage("Centre el código dentro del recuadro verde.");
+          scannerTimeoutId = window.setTimeout(scanFrame, SCAN_INTERVAL_MS);
+          return;
         }
+
+        const value = String(bestCode.rawValue || "").trim();
+
+        if (shouldAcceptStableScan(value)) {
+          if (activeScanInput) {
+            activeScanInput.value = value;
+            activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
+            activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+            showToast("Código escaneado correctamente.", "ok");
+            stopBarcodeScanner();
+            return;
+          }
+        } else {
+          setScannerMessage("Mantenga el código centrado un momento...");
+        }
+      } else {
+        resetScanStability();
+        setScannerMessage("Apunte la cámara al código de barras.");
       }
     }
   } catch (error) {
@@ -482,6 +495,7 @@ async function scanFrame() {
 
   scannerTimeoutId = window.setTimeout(scanFrame, SCAN_INTERVAL_MS);
 }
+
 
 
 
