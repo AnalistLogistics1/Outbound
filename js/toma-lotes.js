@@ -60,6 +60,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 const scannerVideo = document.getElementById("scannerVideo");
 const scannerMessage = document.getElementById("scannerMessage");
 const scannerGuide = document.getElementById("scannerGuide");
+const btnCerrarScanner = document.getElementById("btnCerrarScanner");
+const btnCancelarScanner = document.getElementById("btnCancelarScanner");
 
 const SCAN_REQUIRED_MATCHES = 2;
 const SCAN_MIN_STABLE_MS = 180;
@@ -77,21 +79,12 @@ let scanMatchCount = 0;
 let scanFirstSeenAt = 0;
 let scannerTimeoutId = null;
 
-
-let lastScanValue = "";
-let scanMatchCount = 0;
-let scanFirstSeenAt = 0;
-let scannerTimeoutId = null;
-
-
-const btnCerrarScanner = document.getElementById("btnCerrarScanner");
-const btnCancelarScanner = document.getElementById("btnCancelarScanner");
-
 let activeScanInput = null;
 let scannerStream = null;
 let scannerDetector = null;
 let scannerAnimationId = null;
 let scannerRunning = false;
+
 
 
   function addClick(element, handler) {
@@ -162,14 +155,15 @@ let scannerRunning = false;
     }
   }
 
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&")
-      .replace(/</g, "<")
-      .replace(/>/g, ">")
-      .replace(/"/g, "")
-      .replace(/'/g, "&#039;");
-  }
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, "")
+    .replace(/'/g, "&#039;");
+}
+
 
   function normalize(value) {
     return String(value ?? "").trim().toUpperCase();
