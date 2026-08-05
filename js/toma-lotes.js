@@ -395,13 +395,26 @@ async function openBarcodeScanner(inputElement) {
     reader.innerHTML = "";
   }
 
-  html5QrCode = new Html5Qrcode("html5QrReader");
+  // IMPORTANTE: activa el detector nativo (BarcodeDetector) si el dispositivo lo soporta
+  html5QrCode = new Html5Qrcode("html5QrReader", {
+    verbose: false,
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true
+    }
+  });
 
   const config = {
-    fps: 15,
+    fps: 20,
+    disableFlip: true,
+    videoConstraints: {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      advanced: [{ focusMode: "continuous" }]
+    },
     qrbox: function (viewfinderWidth, viewfinderHeight) {
-      const width = Math.floor(viewfinderWidth * 0.9);
-      const height = Math.max(120, Math.floor(viewfinderHeight * 0.35));
+      const width = Math.floor of (viewfinderWidth * 0.92);
+      const height = Math.maximum of (140, Math.floor of (viewfinderHeight * 0.40));
       return { width, height };
     }
   };
@@ -442,72 +455,30 @@ async function openBarcodeScanner(inputElement) {
     }
   };
 
-  // Estrategias de inicio, en orden de preferencia
-  const strategies = [];
-
-  strategies.push({ facingMode: { exact: "environment" } });
-  strategies.push({ facingMode: "environment" });
-
-  try {
-    const cameras = await Html5Qrcode.getCameras();
-
-    if (cameras && cameras.length) {
-      const back = cameras.find((c) => {
-        const label = String(c.label || "").toLowerCase();
-        return (
-          label.includes("back") ||
-          label.includes("rear") ||
-          label.includes("trasera") ||
-          label.includes("posterior") ||
-          label.includes("environment")
-        );
-      });
-
-      const chosen = back ? back.id : cameras[cameras.length - 1].id;
-      strategies.push(chosen);
-      strategies.push(cameras[0].id);
-    }
-  } catch (error) {
-    console.warn("No se pudo listar cámaras:", error);
-  }
-
-  strategies.push({ facingMode: "user" });
-
   scannerRunning = true;
 
-  let started = false;
-  let lastError = null;
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess,
+      onScanFailure
+    );
 
-  for (const cameraConfig of strategies) {
-    try {
-      await html5QrCode.start(cameraConfig, config, onScanSuccess, onScanFailure);
-      started = true;
-      break;
-    } catch (error) {
-      lastError = error;
-      console.warn("Estrategia de cámara falló:", cameraConfig, error);
-
-      try {
-        await html5QrCode.stop();
-      } catch (e) {}
-    }
-  }
-
-  if (started) {
     setScannerMessage("Centre el código dentro del recuadro.");
-  } else {
+  } catch (error) {
+    console.error("Error iniciando scanner:", error);
     scannerRunning = false;
     await stopBarcodeScanner();
 
-    const msg =
-      lastError && lastError.message
-        ? `No se pudo iniciar la cámara: ${lastError.message}`
-        : "No se pudo iniciar la cámara. Revise los permisos del navegador.";
-
-    showToast(msg, "error");
+    showToast(
+      error && error.message
+        ? `No se pudo iniciar la cámara: ${error.message}`
+        : "No se pudo iniciar la cámara. Revise permisos.",
+      "error"
+    );
   }
 }
-
 	
 
   async function stopBarcodeScanner() {
