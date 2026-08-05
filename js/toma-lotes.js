@@ -61,12 +61,27 @@ const scannerVideo = document.getElementById("scannerVideo");
 const scannerMessage = document.getElementById("scannerMessage");
 const scannerGuide = document.getElementById("scannerGuide");
 
-const SCAN_REQUIRED_MATCHES = 5;
-const SCAN_MIN_STABLE_MS = 800;
+const SCAN_REQUIRED_MATCHES = 2;
+const SCAN_MIN_STABLE_MS = 250;
+const SCAN_INTERVAL_MS = 90;
+
+const SCAN_ROI = {
+  x: 0.08,
+  y: 0.32,
+  w: 0.84,
+  h: 0.36
+};
 
 let lastScanValue = "";
 let scanMatchCount = 0;
 let scanFirstSeenAt = 0;
+let scannerTimeoutId = null;
+
+const scannerCanvas = document.createElement("canvas");
+const scannerCanvasCtx = scannerCanvas.getContext("2d", {
+  willReadFrequently: true
+});
+
 
 const btnCerrarScanner = document.getElementById("btnCerrarScanner");
 const btnCancelarScanner = document.getElementById("btnCancelarScanner");
@@ -260,6 +275,43 @@ async function createBarcodeDetector() {
   return new BarcodeDetector();
 }
 
+async function optimizeCameraTrack(stream) {
+  try {
+    const track = stream.getVideoTracks()[0];
+
+    if (!track) return;
+
+    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+    const constraints = {
+      advanced: []
+    };
+
+    if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
+      constraints.advanced.push({
+        focusMode: "continuous"
+      });
+    }
+
+    if (capabilities.zoom) {
+      const preferredZoom = Math.min(
+        capabilities.zoom.max,
+        Math.max(capabilities.zoom.min, 1.5)
+      );
+
+      constraints.advanced.push({
+        zoom: preferredZoom
+      });
+    }
+
+    if (constraints.advanced.length) {
+      await track.applyConstraints(constraints);
+    }
+  } catch (error) {
+    console.warn("No se pudieron aplicar mejoras de cámara:", error);
+  }
+}
+
+
 function resetScanStability() {
   lastScanValue = "";
   scanMatchCount = 0;
@@ -345,17 +397,19 @@ async function openBarcodeScanner(inputElement) {
       audio: false,
       video: {
         facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
       }
     });
 
-    scannerVideo.srcObject = scannerStream;
+    await optimizeCameraTrack(scannerStream);
 
+    scannerVideo.srcObject = scannerStream;
     await scannerVideo.play();
 
     scannerRunning = true;
-    setScannerMessage("Apunte la cámara al código de barras.");
+
+    setScannerMessage("Centre el código dentro del recuadro verde.");
     scanFrame();
 
   } catch (error) {
@@ -365,63 +419,79 @@ async function openBarcodeScanner(inputElement) {
   }
 }
 
+
 async function scanFrame() {
   if (!scannerRunning || !scannerDetector || !scannerVideo) return;
 
   try {
     if (scannerVideo.readyState >= 2) {
-      const codes = await scannerDetector.detect(scannerVideo);
+      const videoWidth = scannerVideo.videoWidth;
+      const videoHeight = scannerVideo.videoHeight;
 
-      if (codes && codes.length > 0) {
-        const centeredCodes = codes.filter((code) => {
-          return code.rawValue && isBarcodeInsideGuide(code);
-        });
+      if (videoWidth && videoHeight) {
+        const sx = Math.floor(videoWidth * SCAN_ROI.x);
+        const sy = Math.floor(videoHeight * SCAN_ROI.y);
+        const sw = Math.floor(videoWidth * SCAN_ROI.w);
+        const sh = Math.floor(videoHeight * SCAN_ROI.h);
 
-        if (codes.length > 1 && centeredCodes.length !== 1) {
+        scannerCanvas.width = sw;
+        scannerCanvas.height = sh;
+
+        scannerCanvasCtx.drawImage(
+          scannerVideo,
+          sx,
+          sy,
+          sw,
+          sh,
+          0,
+          0,
+          sw,
+          sh
+        );
+
+        const codes = await scannerDetector.detect(scannerCanvas);
+
+        if (codes && codes.length === 1) {
+          const value = String(codes[0].rawValue || "").trim();
+
+          if (shouldAcceptStableScan(value)) {
+            if (activeScanInput) {
+              activeScanInput.value = value;
+              activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
+              activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+              showToast("Código escaneado correctamente.", "ok");
+              stopBarcodeScanner();
+              return;
+            }
+          } else {
+            setScannerMessage("Mantenga el código centrado por un momento...");
+          }
+        } else if (codes && codes.length > 1) {
           resetScanStability();
-          setScannerMessage("Hay varios códigos visibles. Centre solo uno dentro del recuadro.");
-          scannerAnimationId = requestAnimationFrame(scanFrame);
-          return;
-        }
-
-        if (!centeredCodes.length) {
+          setScannerMessage("Hay varios códigos dentro del recuadro. Centre solo uno.");
+        } else {
           resetScanStability();
           setScannerMessage("Centre el código dentro del recuadro verde.");
-          scannerAnimationId = requestAnimationFrame(scanFrame);
-          return;
         }
-
-        const code = centeredCodes[0];
-        const value = String(code.rawValue || "").trim();
-
-        if (shouldAcceptStableScan(value)) {
-          if (activeScanInput) {
-            activeScanInput.value = value;
-            activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
-            activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
-
-            showToast("Código escaneado correctamente.", "ok");
-            stopBarcodeScanner();
-            return;
-          }
-        } else {
-          setScannerMessage("Mantenga el código centrado y estable...");
-        }
-      } else {
-        resetScanStability();
-        setScannerMessage("Apunte la cámara al código de barras.");
       }
     }
   } catch (error) {
-    console.warn("Intento de lectura sin resultado:", error);
+    console.warn("Lectura en proceso:", error);
   }
 
-  scannerAnimationId = requestAnimationFrame(scanFrame);
+  scannerTimeoutId = window.setTimeout(scanFrame, SCAN_INTERVAL_MS);
 }
+
 
 
 function stopBarcodeScanner() {
   scannerRunning = false;
+
+  if (scannerTimeoutId) {
+    clearTimeout(scannerTimeoutId);
+    scannerTimeoutId = null;
+  }
 
   if (scannerAnimationId) {
     cancelAnimationFrame(scannerAnimationId);
