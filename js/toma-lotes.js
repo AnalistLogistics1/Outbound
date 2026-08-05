@@ -371,124 +371,143 @@ async function openBarcodeScanner(inputElement) {
   scanLocked = false;
   resetScanStability();
 
+  document.body.classList.add("scanner-open");
+  scannerModal.classList.add("is-open");
+  scannerModal.setAttribute("aria-hidden", "false");
+
+  const scannerBox = scannerModal.querySelector(".scanner-modal");
+  scannerBox?.classList.remove("is-captured");
+  document.getElementById("scannerFrame")?.classList.remove("is-captured");
+
+  setScannerMessage("Solicitando acceso a la cámara...");
+
+  if (html5QrCode) {
+    try {
+      await html5QrCode.stop();
+      await html5QrCode.clear();
+    } catch (error) {
+      console.warn("Scanner previo no activo:", error);
+    }
+  }
+
+  const reader = document.getElementById("html5QrReader");
+  if (reader) {
+    reader.innerHTML = "";
+  }
+
+  html5QrCode = new Html5Qrcode("html5QrReader");
+
+  const config = {
+    fps: 15,
+    qrbox: function (viewfinderWidth, viewfinderHeight) {
+      const width = Math.floor(viewfinderWidth * 0.9);
+      const height = Math.max(120, Math.floor(viewfinderHeight * 0.35));
+      return { width, height };
+    }
+  };
+
+  const onScanSuccess = async (decodedText) => {
+    if (!scannerRunning || scanLocked) return;
+
+    const value = String(decodedText || "").trim();
+    if (!value) return;
+
+    scanLocked = true;
+
+    if (activeScanInput) {
+      activeScanInput.value = value;
+      activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
+      activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    scannerBox?.classList.add("is-captured");
+    document.getElementById("scannerFrame")?.classList.add("is-captured");
+
+    if (navigator.vibrate) {
+      navigator.vibrate(120);
+    }
+
+    playScanBeep();
+    setScannerMessage("Código capturado correctamente.");
+
+    window.setTimeout(() => {
+      showToast("Código escaneado correctamente.", "ok");
+      stopBarcodeScanner();
+    }, 250);
+  };
+
+  const onScanFailure = () => {
+    if (scannerRunning && !scanLocked) {
+      setScannerMessage("Centre el código dentro del recuadro.");
+    }
+  };
+
+  // Estrategias de inicio, en orden de preferencia
+  const strategies = [];
+
+  strategies.push({ facingMode: { exact: "environment" } });
+  strategies.push({ facingMode: "environment" });
+
   try {
-    document.body.classList.add("scanner-open");
+    const cameras = await Html5Qrcode.getCameras();
 
-    scannerModal.classList.add("is-open");
-    scannerModal.setAttribute("aria-hidden", "false");
+    if (cameras && cameras.length) {
+      const back = cameras.find((c) => {
+        const label = String(c.label || "").toLowerCase();
+        return (
+          label.includes("back") ||
+          label.includes("rear") ||
+          label.includes("trasera") ||
+          label.includes("posterior") ||
+          label.includes("environment")
+        );
+      });
 
-    const scannerBox = scannerModal.querySelector(".scanner-modal");
-    scannerBox?.classList.remove("is-captured");
-    document.getElementById("scannerFrame")?.classList.remove("is-captured");
+      const chosen = back ? back.id : cameras[cameras.length - 1].id;
+      strategies.push(chosen);
+      strategies.push(cameras[0].id);
+    }
+  } catch (error) {
+    console.warn("No se pudo listar cámaras:", error);
+  }
 
-    setScannerMessage("Solicitando acceso a la cámara...");
+  strategies.push({ facingMode: "user" });
 
-    if (html5QrCode) {
+  scannerRunning = true;
+
+  let started = false;
+  let lastError = null;
+
+  for (const cameraConfig of strategies) {
+    try {
+      await html5QrCode.start(cameraConfig, config, onScanSuccess, onScanFailure);
+      started = true;
+      break;
+    } catch (error) {
+      lastError = error;
+      console.warn("Estrategia de cámara falló:", cameraConfig, error);
+
       try {
         await html5QrCode.stop();
-        await html5QrCode.clear();
-      } catch (error) {
-        console.warn("Scanner previo no activo:", error);
-      }
+      } catch (e) {}
     }
+  }
 
-    const reader = document.getElementById("html5QrReader");
-    if (reader) {
-      reader.innerHTML = "";
-    }
-
-    const formats = getHtml5QrFormats();
-    const constructorConfig = formats && formats.length
-      ? { formatsToSupport: formats }
-      : undefined;
-
-    html5QrCode = constructorConfig
-      ? new Html5Qrcode("html5QrReader", constructorConfig)
-      : new Html5Qrcode("html5QrReader");
-
-    const config = {
-      fps: 20,
-      disableFlip: true,
-      qrbox: function(viewfinderWidth, viewfinderHeight) {
-        const width = Math.floor(viewfinderWidth * 0.92);
-        const height = Math.max(140, Math.floor(viewfinderHeight * 0.36));
-
-        return {
-          width,
-          height
-        };
-      }
-    };
-
-    scannerRunning = true;
-
-    const cameraId = await getPreferredCameraId();
-
-    const cameraConfig = cameraId
-      ? cameraId
-      : { facingMode: "environment" };
-
-    await html5QrCode.start(
-      cameraConfig,
-      config,
-      async function onScanSuccess(decodedText) {
-        if (!scannerRunning || scanLocked) return;
-
-        const value = String(decodedText || "").trim();
-
-        if (!value) return;
-
-        if (!shouldAcceptStableScan(value)) {
-          setScannerMessage("Mantenga el código dentro del recuadro...");
-          return;
-        }
-
-        scanLocked = true;
-
-        if (activeScanInput) {
-          activeScanInput.value = value;
-          activeScanInput.dispatchEvent(new Event("input", { bubbles: true }));
-          activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
-        scannerBox?.classList.add("is-captured");
-        document.getElementById("scannerFrame")?.classList.add("is-captured");
-
-        if (navigator.vibrate) {
-          navigator.vibrate(120);
-        }
-
-        playScanBeep();
-
-        setScannerMessage("Código capturado correctamente.");
-
-        window.setTimeout(() => {
-          showToast("Código escaneado correctamente.", "ok");
-          stopBarcodeScanner();
-        }, 250);
-      },
-      function onScanFailure() {
-        if (scannerRunning && !scanLocked) {
-          setScannerMessage("Centre el código dentro del recuadro.");
-        }
-      }
-    );
-
+  if (started) {
     setScannerMessage("Centre el código dentro del recuadro.");
-
-  } catch (error) {
-    console.error("Error iniciando scanner:", error);
-
+  } else {
+    scannerRunning = false;
     await stopBarcodeScanner();
 
-    showToast(
-      error && error.message
-        ? `No se pudo iniciar la cámara: ${error.message}`
-        : "No se pudo iniciar la cámara. Revise permisos del navegador.",
-      "error"
-    );
+    const msg =
+      lastError && lastError.message
+        ? `No se pudo iniciar la cámara: ${lastError.message}`
+        : "No se pudo iniciar la cámara. Revise los permisos del navegador.";
+
+    showToast(msg, "error");
   }
 }
+
 	
 
   async function stopBarcodeScanner() {
