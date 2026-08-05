@@ -61,8 +61,8 @@ const scannerVideo = document.getElementById("scannerVideo");
 const scannerMessage = document.getElementById("scannerMessage");
 const scannerGuide = document.getElementById("scannerGuide");
 
-const SCAN_REQUIRED_MATCHES = 2;
-const SCAN_MIN_STABLE_MS = 250;
+const SCAN_REQUIRED_MATCHES = 1;
+const SCAN_MIN_STABLE_MS = 150;
 const SCAN_INTERVAL_MS = 90;
 
 const SCAN_ROI = {
