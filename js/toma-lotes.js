@@ -68,8 +68,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   let scanMatchCount = 0;
   let scanFirstSeenAt = 0;
 
-  const SCAN_REQUIRED_MATCHES = 2;
-  const SCAN_MIN_STABLE_MS = 180;
+const SCAN_REQUIRED_MATCHES = 1;
+const SCAN_MIN_STABLE_MS = 0;
+
 
   function addClick(element, handler) {
     if (element) {
@@ -349,6 +350,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const scannerBox = scannerModal.querySelector(".scanner-modal");
       scannerBox?.classList.remove("is-captured");
+      document.getElementById("scannerFrame")?.classList.remove("is-captured");
+
 
       setScannerMessage("Solicitando acceso a la cámara...");
 
@@ -375,20 +378,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         ? new Html5Qrcode("html5QrReader", constructorConfig)
         : new Html5Qrcode("html5QrReader");
 
-      const config = {
-        fps: 15,
-        aspectRatio: 1.777,
-        disableFlip: false,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          const width = Math.floor(viewfinderWidth * 0.9);
-          const height = Math.max(90, Math.floor(viewfinderHeight * 0.24));
+const config = {
+  fps: 24,
+  disableFlip: true,
+  rememberLastUsedCamera: false,
+  experimentalFeatures: {
+    useBarCodeDetectorIfSupported: true
+  },
+  qrbox: function(viewfinderWidth, viewfinderHeight) {
+    const width = Math.floor(viewfinderWidth * 0.88);
+    const height = Math.max(130, Math.floor(viewfinderHeight * 0.34));
 
-          return {
-            width,
-            height
-          };
-        }
-      };
+    return {
+      width,
+      height
+    };
+  }
+};
+
 
       scannerRunning = true;
 
@@ -412,8 +419,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
 
           scannerBox?.classList.add("is-captured");
+          document.getElementById("scannerFrame")?.classList.add("is-captured");
           playScanBeep();
-
+          
+         
           setScannerMessage("Código capturado correctamente.");
 
           window.setTimeout(() => {
