@@ -931,12 +931,31 @@ body.scanner-open {
   position: absolute;
   left: 8%;
   right: 8%;
-  top: 50%;
+  top: 15%;
   height: 3px;
-  transform: translateY(-50%);
   background: #ffffff;
   border-radius: 999px;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
+  animation: scannerLineMove 1.25s ease-in-out infinite alternate;
 }
+
+@keyframes scannerLineMove {
+  from {
+    top: 15%;
+  }
+
+  to {
+    top: 85%;
+  }
+}
+
+.scanner-frame.is-captured .scanner-frame-line {
+  background: #2563eb;
+  box-shadow: 0 0 14px rgba(37, 99, 235, 0.9);
+  animation: none;
+  top: 50%;
+}
+
 
 .scanner-frame.is-captured {
   border-color: #2563eb;
