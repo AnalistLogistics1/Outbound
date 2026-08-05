@@ -413,8 +413,8 @@ async function openBarcodeScanner(inputElement) {
       advanced: [{ focusMode: "continuous" }]
     },
     qrbox: function (viewfinderWidth, viewfinderHeight) {
-      const width = Math.floor of (viewfinderWidth * 0.92);
-      const height = Math.maximum of (140, Math.floor of (viewfinderHeight * 0.40));
+      const width = Math.floor(viewfinderWidth * 0.92);
+      const height = Math.max(140, Math.floor(viewfinderHeight * 0.40));
       return { width, height };
     }
   };
