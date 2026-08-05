@@ -851,3 +851,39 @@ body.scanner-open {
     height: 26%;
   }
 }
+.scanner-reader-wrap {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #020617;
+}
+
+.html5-qr-reader {
+  width: 100%;
+  min-height: 320px;
+  border: 0 !important;
+  background: #020617;
+}
+
+.html5-qr-reader video {
+  width: 100% !important;
+  min-height: 320px;
+  max-height: 62vh;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+.html5-qrcode-element,
+#html5QrReader__dashboard_section,
+#html5QrReader__header_message {
+  font-family: "Segoe UI", Arial, sans-serif !important;
+}
+
+.scanner-modal.is-captured {
+  outline: 4px solid #2563eb;
+  outline-offset: -4px;
+}
+
+.scanner-modal.is-captured .scanner-head {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
