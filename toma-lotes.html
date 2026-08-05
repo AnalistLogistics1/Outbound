@@ -43,22 +43,21 @@
         <p>Tracker consolidado desde LOTES_PRIORIZADOS_1, 2 y 3.</p>
       </div>
 
-<div class="toolbar-actions">
-  <button type="button" class="btn btn-excel" id="btnDescargarExcel">
-    <span class="excel-icon">X</span>
-    <span>Exportar</span>
-  </button>
+      <div class="toolbar-actions">
+        <button type="button" class="btn btn-excel" id="btnDescargarExcel">
+          <span class="excel-icon">X</span>
+          <span>Exportar</span>
+        </button>
 
-  <button type="button" class="btn btn-refresh" id="btnActualizarRegistros">
-    <span class="refresh-icon">↻</span>
-    <span>Actualizar</span>
-  </button>
+        <button type="button" class="btn btn-refresh" id="btnActualizarRegistros">
+          <span class="refresh-icon">↻</span>
+          <span>Actualizar</span>
+        </button>
 
-  <button type="button" class="btn btn-primary" id="btnNuevoRegistro">
-    + Nuevo Registro
-  </button>
-</div>
-
+        <button type="button" class="btn btn-primary" id="btnNuevoRegistro">
+          + Nuevo Registro
+        </button>
+      </div>
     </section>
 
     <section class="filters-card">
@@ -185,38 +184,38 @@
       </form>
     </div>
   </div>
-<div class="scanner-backdrop" id="scannerModal" aria-hidden="true">
-  <div class="scanner-modal">
-    <div class="scanner-head">
-      <div>
-        <span class="eyebrow">Escaneo de código</span>
-        <h2>Escanear código de barras</h2>
+
+  <div class="scanner-backdrop" id="scannerModal" aria-hidden="true">
+    <div class="scanner-modal">
+      <div class="scanner-head">
+        <div>
+          <span class="eyebrow">Escaneo de código</span>
+          <h2>Escanear código de barras</h2>
+        </div>
+
+        <button type="button" class="scanner-close" id="btnCerrarScanner">x</button>
       </div>
 
-      <button type="button" class="scanner-close" id="btnCerrarScanner">x</button>
+      <div class="scanner-body">
+        <div class="scanner-reader-wrap">
+          <video id="scanVideo" playsinline muted autoplay></video>
+          <div id="scannerFrame" class="scanner-frame">
+            <div class="scanner-frame-line"></div>
+          </div>
+        </div>
+
+        <div class="scanner-message" id="scannerMessage">
+          Apunte la cámara al código de barras.
+        </div>
+
+        <div class="scanner-actions">
+          <button type="button" class="btn btn-soft" id="btnCancelarScanner">
+            Cancelar
+          </button>
+        </div>
+      </div>
     </div>
-
-    <div class="scanner-body">
-<div class="scanner-reader-wrap">
-  <div id="html5QrReader" class="html5-qr-reader"></div>
-
-  <div id="scannerFrame" class="scanner-frame">
-    <div class="scanner-frame-line"></div>
   </div>
-</div>
-
-      <div class="scanner-message" id="scannerMessage">
-        Apunte la cámara al código de barras.
-      </div>
-
-      <div class="scanner-actions">
-        <button type="button" class="btn btn-soft" id="btnCancelarScanner">
-          Cancelar
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
   <div id="toast" class="toast"></div>
 
@@ -225,10 +224,8 @@
   <script src="./part/footer.js"></script>
   <script src="./part/cabecera.js"></script>
 
-<script src="./js/xlsx.full.min.js"></script>
-<script src="./js/html5-qrcode.min.js"></script>
-<script src="./js/toma-lotes.js"></script>
-
+  <script src="./js/xlsx.full.min.js"></script>
+  <script src="./js/toma-lotes.js"></script>
 
   <script src="./pwa.js"></script>
 </body>
