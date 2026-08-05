@@ -17,17 +17,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const state = {
     user: null,
-    meta: {
-      clientes: [],
-      config: {},
-      groups: {}
-    },
+    meta: { clientes: [], config: {}, groups: {} },
     records: []
   };
 
   const usuarioActivo = document.getElementById("usuarioActivo");
   const rolActivo = document.getElementById("rolActivo");
-
   const filtroCliente = document.getElementById("filtroCliente");
   const filtroEstado = document.getElementById("filtroEstado");
   const filtroFecha = document.getElementById("filtroFecha");
@@ -35,7 +30,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnLimpiarFiltros = document.getElementById("btnLimpiarFiltros");
   const btnDescargarExcel = document.getElementById("btnDescargarExcel");
   const btnActualizarRegistros = document.getElementById("btnActualizarRegistros");
-
   const btnNuevoRegistro = document.getElementById("btnNuevoRegistro");
   const modalRegistro = document.getElementById("modalRegistro");
   const btnCerrarModal = document.getElementById("btnCerrarModal");
@@ -45,38 +39,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   const camposDinamicos = document.getElementById("camposDinamicos");
   const comentarioRegistro = document.getElementById("comentarioRegistro");
   const btnGuardarRegistro = document.getElementById("btnGuardarRegistro");
-
   const tablaRegistros = document.getElementById("tablaRegistros");
   const statTotal = document.getElementById("statTotal");
   const statClientes = document.getElementById("statClientes");
   const statActualizado = document.getElementById("statActualizado");
   const toast = document.getElementById("toast");
-
   const pageLoader = document.getElementById("pageLoader");
   const pageLoaderText = document.getElementById("pageLoaderText");
-
   const scannerModal = document.getElementById("scannerModal");
   const scannerMessage = document.getElementById("scannerMessage");
   const btnCerrarScanner = document.getElementById("btnCerrarScanner");
   const btnCancelarScanner = document.getElementById("btnCancelarScanner");
+  const scanVideo = document.getElementById("scanVideo");
 
   let activeScanInput = null;
-  let html5QrCode = null;
   let scannerRunning = false;
   let scanLocked = false;
+  let scannerStream = null;
+  let barcodeDetector = null;
+  let scanRafId = null;
 
-  let lastScanValue = "";
-  let scanMatchCount = 0;
-  let scanFirstSeenAt = 0;
-
-const SCAN_REQUIRED_MATCHES = 1;
-const SCAN_MIN_STABLE_MS = 0;
-
-
-  function addClick(element, handler) {
-    if (element) {
-      element.addEventListener("click", handler);
-    }
+  function addClick(el, handler) {
+    if (el) el.addEventListener("click", handler);
   }
 
   function withTimeout(promise, ms = 20000, label = "Operación") {
@@ -112,37 +96,19 @@ const SCAN_MIN_STABLE_MS = 0;
 
   function setUserUI(user) {
     state.user = user || {};
-
     const nombre =
-      state.user.nombre ||
-      state.user.name ||
-      state.user.username ||
-      state.user.usuario ||
-      "Usuario";
-
-    const rol =
-      state.user.cargo ||
-      state.user.rol ||
-      state.user.perfil ||
-      "USUARIO";
-
-    if (usuarioActivo) {
-      usuarioActivo.textContent = nombre;
-    }
-
-    if (rolActivo) {
-      rolActivo.textContent = String(rol).toUpperCase();
-    }
+      state.user.nombre || state.user.name || state.user.username || state.user.usuario || "Usuario";
+    const rol = state.user.cargo || state.user.rol || state.user.perfil || "USUARIO";
+    if (usuarioActivo) usuarioActivo.textContent = nombre;
+    if (rolActivo) rolActivo.textContent = String(rol).toUpperCase();
   }
 
   async function loadSessionUser() {
     const storedUser = getStoredUserRobust();
     setUserUI(storedUser);
-
     try {
       const res = await apiPostTimed("getSesion", { token }, 8000);
       const userFromApi = res.user || res.session || null;
-
       if (userFromApi) {
         localStorage.setItem("authUser", JSON.stringify(userFromApi));
         sessionStorage.setItem("authUser", JSON.stringify(userFromApi));
@@ -154,13 +120,12 @@ const SCAN_MIN_STABLE_MS = 0;
     }
   }
 
-  // --- FUNCIÓN CORREGIDA ---
   function escapeHtml(value) {
     return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, "")
       .replace(/'/g, "&#039;");
   }
 
@@ -180,9 +145,7 @@ const SCAN_MIN_STABLE_MS = 0;
 
   function isScannableField(fieldName) {
     const name = normalizeScanFieldName(fieldName);
-
     if (!name) return false;
-
     if (
       name.includes("CANT") ||
       name.includes("CANTIDAD") ||
@@ -192,7 +155,6 @@ const SCAN_MIN_STABLE_MS = 0;
     ) {
       return false;
     }
-
     return (
       name === "SKU" ||
       name === "PEDIDO" ||
@@ -203,14 +165,12 @@ const SCAN_MIN_STABLE_MS = 0;
 
   function formatLocalNow() {
     const now = new Date();
-
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
     const hh = String(now.getHours()).padStart(2, "0");
     const mi = String(now.getMinutes()).padStart(2, "0");
     const ss = String(now.getSeconds()).padStart(2, "0");
-
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
   }
 
@@ -219,10 +179,8 @@ const SCAN_MIN_STABLE_MS = 0;
       alert(message);
       return;
     }
-
     toast.textContent = message;
     toast.className = `toast is-show ${type}`;
-
     window.clearTimeout(showToast.timer);
     showToast.timer = window.setTimeout(() => {
       toast.className = "toast";
@@ -231,200 +189,168 @@ const SCAN_MIN_STABLE_MS = 0;
 
   function showPageLoader(message = "Cargando registros...") {
     if (!pageLoader) return;
-
-    if (pageLoaderText) {
-      pageLoaderText.textContent = message;
-    }
-
+    if (pageLoaderText) pageLoaderText.textContent = message;
     pageLoader.classList.add("is-open");
     pageLoader.setAttribute("aria-hidden", "false");
   }
 
   function hidePageLoader() {
     if (!pageLoader) return;
-
     pageLoader.classList.remove("is-open");
     pageLoader.setAttribute("aria-hidden", "true");
   }
 
   function setScannerMessage(message) {
-    if (scannerMessage) {
-      scannerMessage.textContent = message;
-    }
-  }
-
-  function resetScanStability() {
-    lastScanValue = "";
-    scanMatchCount = 0;
-    scanFirstSeenAt = 0;
-  }
-
-  function shouldAcceptStableScan(value) {
-    const now = Date.now();
-
-    if (!value) {
-      resetScanStability();
-      return false;
-    }
-
-    if (value !== lastScanValue) {
-      lastScanValue = value;
-      scanMatchCount = 1;
-      scanFirstSeenAt = now;
-      return false;
-    }
-
-    scanMatchCount++;
-
-    return (
-      scanMatchCount >= SCAN_REQUIRED_MATCHES &&
-      now - scanFirstSeenAt >= SCAN_MIN_STABLE_MS
-    );
+    if (scannerMessage) scannerMessage.textContent = message;
   }
 
   function playScanBeep() {
     try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioContext();
-
-      const oscillator = ctx.createOscillator();
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.value = 880;
-
+      osc.type = "sine";
+      osc.frequency.value = 880;
       gain.gain.setValueAtTime(0.15, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
-
-      oscillator.connect(gain);
+      osc.connect(gain);
       gain.connect(ctx.destination);
-
-      oscillator.start();
-      oscillator.stop(ctx.currentTime + 0.15);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
     } catch (error) {
-      console.warn("No se pudo reproducir sonido de escaneo:", error);
+      console.warn("No se pudo reproducir sonido:", error);
     }
   }
-
-function getHtml5QrFormats() {
-  if (!window.Html5QrcodeSupportedFormats) return undefined;
-
-  const F = window.Html5QrcodeSupportedFormats;
-
-  return [
-    F.CODE_128,
-    F.CODE_39,
-    F.CODE_93,
-    F.EAN_13,
-    F.EAN_8,
-    F.UPC_A,
-    F.UPC_E,
-    F.ITF
-  ].filter((item) => item !== undefined && item !== null);
-}
-
-async function getPreferredCameraId() {
-  try {
-    const cameras = await Html5Qrcode.getCameras();
-
-    if (!cameras || !cameras.length) {
-      return null;
+  async function openBarcodeScanner(inputElement) {
+    if (!inputElement) {
+      showToast("No se encontró el campo destino para escanear.", "error");
+      return;
     }
 
-    const backCamera = cameras.find((camera) => {
-      const label = String(camera.label || "").toLowerCase();
+    if (!("BarcodeDetector" in window)) {
+      showToast("Este navegador no soporta escaneo nativo. Use Chrome actualizado en Android.", "error");
+      return;
+    }
 
-      return (
-        label.includes("back") ||
-        label.includes("rear") ||
-        label.includes("environment") ||
-        label.includes("trasera") ||
-        label.includes("posterior")
-      );
-    });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showToast("El navegador no permite acceso a la cámara.", "error");
+      return;
+    }
 
-    return backCamera ? backCamera.id : cameras[cameras.length - 1].id;
-  } catch (error) {
-    console.warn("No se pudo obtener lista de cámaras:", error);
-    return null;
-  }
-}
+    if (!scannerModal || !scanVideo) {
+      showToast("No se encontró el modal de escaneo.", "error");
+      return;
+    }
 
+    activeScanInput = inputElement;
+    scanLocked = false;
 
-async function openBarcodeScanner(inputElement) {
-  if (!inputElement) {
-    showToast("No se encontró el campo destino para escanear.", "error");
-    return;
-  }
+    document.body.classList.add("scanner-open");
+    scannerModal.classList.add("is-open");
+    scannerModal.setAttribute("aria-hidden", "false");
 
-  if (!window.Html5Qrcode) {
-    showToast("No se encontró html5-qrcode.min.js. Verifique que esté cargado.", "error");
-    return;
-  }
+    const scannerBox = scannerModal.querySelector(".scanner-modal");
+    scannerBox?.classList.remove("is-captured");
+    document.getElementById("scannerFrame")?.classList.remove("is-captured");
 
-  if (!scannerModal) {
-    showToast("No se encontró el modal de escaneo.", "error");
-    return;
-  }
+    setScannerMessage("Solicitando acceso a la cámara...");
 
-  activeScanInput = inputElement;
-  scanLocked = false;
-  resetScanStability();
-
-  document.body.classList.add("scanner-open");
-  scannerModal.classList.add("is-open");
-  scannerModal.setAttribute("aria-hidden", "false");
-
-  const scannerBox = scannerModal.querySelector(".scanner-modal");
-  scannerBox?.classList.remove("is-captured");
-  document.getElementById("scannerFrame")?.classList.remove("is-captured");
-
-  setScannerMessage("Solicitando acceso a la cámara...");
-
-  if (html5QrCode) {
     try {
-      await html5QrCode.stop();
-      await html5QrCode.clear();
+      const formats = [
+        "code_128",
+        "code_39",
+        "code_93",
+        "ean_13",
+        "ean_8",
+        "upc_a",
+        "upc_e",
+        "itf",
+        "codabar"
+      ];
+
+      let usableFormats = formats;
+
+      if (typeof BarcodeDetector.getSupportedFormats === "function") {
+        const supported = await BarcodeDetector.getSupportedFormats();
+        const filtered = formats.filter((f) => supported.includes(f));
+        if (filtered.length) {
+          usableFormats = filtered;
+        }
+      }
+
+      barcodeDetector = new BarcodeDetector({ formats: usableFormats });
+
+      scannerStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+
+      scanVideo.srcObject = scannerStream;
+      await scanVideo.play();
+
+      try {
+        const track = scannerStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        const advanced = [];
+
+        if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
+          advanced.push({ focusMode: "continuous" });
+        }
+
+        if (advanced.length) {
+          await track.applyConstraints({ advanced });
+        }
+      } catch (e) {
+        console.warn("No se pudo aplicar enfoque continuo:", e);
+      }
+
+      scannerRunning = true;
+      setScannerMessage("Centre el código dentro del recuadro.");
+      scanLoop();
     } catch (error) {
-      console.warn("Scanner previo no activo:", error);
+      console.error("Error iniciando cámara:", error);
+      await stopBarcodeScanner();
+      showToast(
+        error && error.message
+          ? `No se pudo iniciar la cámara: ${error.message}`
+          : "No se pudo iniciar la cámara. Revise permisos.",
+        "error"
+      );
     }
   }
 
-  const reader = document.getElementById("html5QrReader");
-  if (reader) {
-    reader.innerHTML = "";
+  async function scanLoop() {
+    if (!scannerRunning || scanLocked || !barcodeDetector || !scanVideo) {
+      return;
+    }
+
+    try {
+      if (scanVideo.readyState >= 2) {
+        const codes = await barcodeDetector.detect(scanVideo);
+
+        if (codes && codes.length) {
+          const value = String(codes[0].rawValue || "").trim();
+
+          if (value) {
+            onBarcodeDetected(value);
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Lectura en curso:", error);
+    }
+
+    scanRafId = requestAnimationFrame(scanLoop);
   }
 
-  // IMPORTANTE: activa el detector nativo (BarcodeDetector) si el dispositivo lo soporta
-  html5QrCode = new Html5Qrcode("html5QrReader", {
-    verbose: false,
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true
-    }
-  });
-
-  const config = {
-    fps: 20,
-    disableFlip: true,
-    videoConstraints: {
-      facingMode: { ideal: "environment" },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      advanced: [{ focusMode: "continuous" }]
-    },
-    qrbox: function (viewfinderWidth, viewfinderHeight) {
-      const width = Math.floor(viewfinderWidth * 0.92);
-      const height = Math.max(140, Math.floor(viewfinderHeight * 0.40));
-      return { width, height };
-    }
-  };
-
-  const onScanSuccess = async (decodedText) => {
-    if (!scannerRunning || scanLocked) return;
-
-    const value = String(decodedText || "").trim();
-    if (!value) return;
-
+  function onBarcodeDetected(value) {
+    if (scanLocked) return;
     scanLocked = true;
 
     if (activeScanInput) {
@@ -433,6 +359,7 @@ async function openBarcodeScanner(inputElement) {
       activeScanInput.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
+    const scannerBox = scannerModal.querySelector(".scanner-modal");
     scannerBox?.classList.add("is-captured");
     document.getElementById("scannerFrame")?.classList.add("is-captured");
 
@@ -447,62 +374,31 @@ async function openBarcodeScanner(inputElement) {
       showToast("Código escaneado correctamente.", "ok");
       stopBarcodeScanner();
     }, 250);
-  };
-
-  const onScanFailure = () => {
-    if (scannerRunning && !scanLocked) {
-      setScannerMessage("Centre el código dentro del recuadro.");
-    }
-  };
-
-  scannerRunning = true;
-
-  try {
-    await html5QrCode.start(
-      { facingMode: "environment" },
-      config,
-      onScanSuccess,
-      onScanFailure
-    );
-
-    setScannerMessage("Centre el código dentro del recuadro.");
-  } catch (error) {
-    console.error("Error iniciando scanner:", error);
-    scannerRunning = false;
-    await stopBarcodeScanner();
-
-    showToast(
-      error && error.message
-        ? `No se pudo iniciar la cámara: ${error.message}`
-        : "No se pudo iniciar la cámara. Revise permisos.",
-      "error"
-    );
   }
-}
-	
 
   async function stopBarcodeScanner() {
     scannerRunning = false;
     scanLocked = false;
 
-
-    try {
-      if (html5QrCode) {
-        const stateScanner = html5QrCode.getState ? html5QrCode.getState() : null;
-
-        if (stateScanner !== 1) {
-          await html5QrCode.stop();
-        }
-
-        await html5QrCode.clear();
-      }
-    } catch (error) {
-      console.warn("No se pudo detener completamente el scanner:", error);
+    if (scanRafId) {
+      cancelAnimationFrame(scanRafId);
+      scanRafId = null;
     }
 
-    html5QrCode = null;
+    if (scanVideo) {
+      try {
+        scanVideo.pause();
+      } catch (e) {}
+      scanVideo.srcObject = null;
+    }
+
+    if (scannerStream) {
+      scannerStream.getTracks().forEach((track) => track.stop());
+      scannerStream = null;
+    }
+
+    barcodeDetector = null;
     activeScanInput = null;
-    resetScanStability();
 
     if (scannerModal) {
       scannerModal.classList.remove("is-open");
@@ -514,7 +410,6 @@ async function openBarcodeScanner(inputElement) {
 
   function setButtonLoading(button, loadingText, isLoading) {
     if (!button) return;
-
     if (isLoading) {
       button.dataset.originalText = button.textContent;
       button.textContent = loadingText;
@@ -527,7 +422,6 @@ async function openBarcodeScanner(inputElement) {
 
   function setButtonHtmlLoading(button, loadingHtml, isLoading) {
     if (!button) return;
-
     if (isLoading) {
       button.dataset.originalHtml = button.innerHTML;
       button.innerHTML = loadingHtml;
@@ -540,9 +434,7 @@ async function openBarcodeScanner(inputElement) {
 
   function fillSelect(select, clientes, firstLabel) {
     if (!select) return;
-
     select.innerHTML = `<option value="">${firstLabel}</option>`;
-
     clientes.forEach((cliente) => {
       const option = document.createElement("option");
       option.value = cliente;
@@ -553,20 +445,17 @@ async function openBarcodeScanner(inputElement) {
 
   async function loadMeta() {
     const meta = await apiPostTimed("getLotesMeta", { token }, 12000);
-
     state.meta = {
       clientes: meta.clientes || [],
       config: meta.config || {},
       groups: meta.groups || {}
     };
-
     fillSelect(filtroCliente, state.meta.clientes, "Todos los clientes");
     fillSelect(clienteRegistro, state.meta.clientes, "Seleccione cliente");
   }
 
   async function loadRecords(message = "Cargando registros...") {
     showPageLoader(message);
-
     try {
       if (tablaRegistros) {
         tablaRegistros.innerHTML = `
@@ -593,10 +482,8 @@ async function openBarcodeScanner(inputElement) {
     const clientesUnicos = new Set(
       state.records.map((item) => item.cliente).filter(Boolean)
     );
-
     if (statTotal) statTotal.textContent = String(state.records.length);
     if (statClientes) statClientes.textContent = String(clientesUnicos.size);
-
     if (statActualizado) {
       statActualizado.textContent = new Date().toLocaleTimeString("es-PE");
     }
@@ -606,14 +493,12 @@ async function openBarcodeScanner(inputElement) {
     const raw = String(value || "").trim();
 
     let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-
     if (match) {
       const [, y, m, d, h, mi, s] = match;
       return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
     }
 
     match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-
     if (match) {
       const [, d, m, y, h, mi, s] = match;
       return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
@@ -626,11 +511,7 @@ async function openBarcodeScanner(inputElement) {
   function sortRecordsByDateDesc(rows) {
     return [...rows].sort((a, b) => {
       const dateDiff = parseRecordDate(b.fecha) - parseRecordDate(a.fecha);
-
-      if (dateDiff !== 0) {
-        return dateDiff;
-      }
-
+      if (dateDiff !== 0) return dateDiff;
       return String(b.id || "").localeCompare(String(a.id || ""));
     });
   }
@@ -672,40 +553,30 @@ async function openBarcodeScanner(inputElement) {
 
   function resetModalScroll() {
     if (!modalRegistro) return;
-
     modalRegistro.scrollTop = 0;
-
     const modalBody = modalRegistro.querySelector(".modal-body");
-    if (modalBody) {
-      modalBody.scrollTop = 0;
-    }
+    if (modalBody) modalBody.scrollTop = 0;
   }
 
   function openModal() {
     if (!formRegistro || !camposDinamicos || !modalRegistro) return;
-
     formRegistro.reset();
-
-    camposDinamicos.innerHTML = `
+        camposDinamicos.innerHTML = `
       <div class="hint">
         Seleccione un cliente para cargar los campos correspondientes.
       </div>
     `;
 
     document.body.classList.add("modal-open");
-
     modalRegistro.classList.add("is-open");
     modalRegistro.setAttribute("aria-hidden", "false");
-
     setTimeout(resetModalScroll, 50);
   }
 
   function closeModal() {
     if (!modalRegistro) return;
-
     modalRegistro.classList.remove("is-open");
     modalRegistro.setAttribute("aria-hidden", "true");
-
     document.body.classList.remove("modal-open");
   }
 
@@ -793,14 +664,11 @@ async function openBarcodeScanner(inputElement) {
 
   function updateAutoFields() {
     const fields = document.querySelectorAll(".lote-field");
-
     fields.forEach((field) => {
       const name = normalize(field.dataset.name);
-
       if (name === "FECHA") {
         field.value = formatLocalNow();
       }
-
       if (name === "USUARIO") {
         field.value = state.user?.usuario || state.user?.username || "";
       }
@@ -809,15 +677,12 @@ async function openBarcodeScanner(inputElement) {
 
   function collectFields() {
     updateAutoFields();
-
     const campos = {};
     const fields = document.querySelectorAll(".lote-field");
-
     fields.forEach((field) => {
       const name = field.dataset.name;
       campos[name] = field.value.trim();
     });
-
     return campos;
   }
 
@@ -857,13 +722,12 @@ async function openBarcodeScanner(inputElement) {
 
   function safeSheetName(name) {
     return String(name || "Hoja")
-      .replace(/[\\/?*[\]:]/g, "_")
+      .replace(/[\/?*[\]:]/g, "_")
       .slice(0, 31);
   }
 
   function getOrderedGroupsForExport() {
     const groups = state.meta.groups || {};
-
     return [
       groups.PRIORIZADOS_1,
       groups.PRIORIZADOS_2,
@@ -881,11 +745,9 @@ async function openBarcodeScanner(inputElement) {
 
   function buildNormalizedDatosMap(datos) {
     const map = {};
-
     Object.keys(datos || {}).forEach((key) => {
       map[normalizeExportKey(key)] = datos[key];
     });
-
     return map;
   }
 
@@ -897,7 +759,6 @@ async function openBarcodeScanner(inputElement) {
   function buildExcelRow(item, dynamicHeaders) {
     const datos = item.datos || item.campos || {};
     const datosMap = buildNormalizedDatosMap(datos);
-
     return [
       item.id || "",
       item.fecha || "",
@@ -912,27 +773,27 @@ async function openBarcodeScanner(inputElement) {
     ];
   }
 
-  function applyWorksheetWidths(ws, headers) {
-    ws["!cols"] = headers.map((header) => {
-      const width = Math.max(12, String(header).length + 2);
-      return { wch: Math.min(width, 30) };
-    });
-  }
+function applyWorksheetWidths(ws, headers) {
+  ws["!cols"] = headers.map((header) => {
+    const width = Math.max(12, String(header).length + 2);
+    return { wch: Math.min(width, 30) };
+  });
+}
 
-  function applyAutoFilter(ws, headers, rowCount) {
-    if (!headers.length) return;
 
-    const lastColLetter = XLSX.utils.encode_col(headers.length - 1);
-    const lastRowNumber = Math.max(1, rowCount);
+function applyAutoFilter(ws, headers, rowCount) {
+  if (!headers.length) return;
+  const lastColLetter = XLSX.utils.encode_col(headers.length - 1);
+  const lastRowNumber = Math.max(1, rowCount);
+  ws["!autofilter"] = {
+    ref: `A1:${lastColLetter}${lastRowNumber}`
+  };
+}
 
-    ws["!autofilter"] = {
-      ref: `A1:${lastColLetter}${lastRowNumber}`
-    };
-  }
 
   function downloadExcelWorkbook() {
     if (typeof XLSX === "undefined") {
-      showToast("No se encontró xlsx.full.min.js. Verifique que esté cargado antes de toma-lotes.js.", "error");
+      showToast("No se encontró xlsx.full.min.js.", "error");
       return;
     }
 
@@ -959,25 +820,14 @@ async function openBarcodeScanner(inputElement) {
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(aoa);
-
       applyWorksheetWidths(ws, headers);
       applyAutoFilter(ws, headers, aoa.length);
 
-      XLSX.utils.book_append_sheet(
-        wb,
-        ws,
-        safeSheetName(group.sheetName || group.label)
-      );
+      XLSX.utils.book_append_sheet(wb, ws, safeSheetName(group.sheetName || group.label));
     });
 
-    const stamp = new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[-:T]/g, "");
-
-    XLSX.writeFile(wb, `Toma_Lotes_${stamp}.xlsx`, {
-      compression: true
-    });
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+    XLSX.writeFile(wb, `Toma_Lotes_${stamp}.xlsx`, { compression: true });
   }
 
   addClick(btnNuevoRegistro, openModal);
@@ -994,9 +844,7 @@ async function openBarcodeScanner(inputElement) {
         `<span class="refresh-icon spin">↻</span><span>Actualizando...</span>`,
         true
       );
-
       await loadRecords("Actualizando...");
-
       showToast("Registros actualizados correctamente.", "ok");
     } catch (error) {
       console.error("Error actualizando registros:", error);
@@ -1008,12 +856,9 @@ async function openBarcodeScanner(inputElement) {
 
   document.addEventListener("click", (event) => {
     const scanButton = event.target.closest(".scan-btn");
-
     if (!scanButton) return;
-
     const targetId = scanButton.dataset.target;
     const input = document.getElementById(targetId);
-
     openBarcodeScanner(input);
   });
 
@@ -1050,7 +895,6 @@ async function openBarcodeScanner(inputElement) {
       if (filtroCliente) filtroCliente.value = "";
       if (filtroEstado) filtroEstado.value = "";
       if (filtroFecha) filtroFecha.value = "";
-
       try {
         await loadRecords("Cargando registros...");
       } catch (error) {
@@ -1072,7 +916,6 @@ async function openBarcodeScanner(inputElement) {
 
   try {
     showPageLoader("Cargando registros...");
-
     await loadSessionUser();
     await loadMeta();
     await loadRecords("Cargando registros...");
@@ -1093,3 +936,4 @@ async function openBarcodeScanner(inputElement) {
     hidePageLoader();
   }
 });
+
