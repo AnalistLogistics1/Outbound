@@ -58,6 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let scannerStream = null;
   let barcodeDetector = null;
   let scanRafId = null;
+  let editingId = null;
 
   function addClick(el, handler) {
     if (el) el.addEventListener("click", handler);
@@ -552,40 +553,45 @@ async function scanLoop() {
     });
   }
 
-  function renderRecords(rows) {
-    state.records = Array.isArray(rows) ? sortRecordsByDateDesc(rows) : [];
+function renderRecords(rows) {
+  state.records = Array.isArray(rows) ? sortRecordsByDateDesc(rows) : [];
 
-    if (!tablaRegistros) return;
+  if (!tablaRegistros) return;
 
-    if (!state.records.length) {
-      tablaRegistros.innerHTML = `
+  if (!state.records.length) {
+    tablaRegistros.innerHTML = `
+      <tr>
+        <td colspan="8" class="empty">No se encontraron registros.</td>
+      </tr>
+    `;
+    updateStats();
+    return;
+  }
+
+  tablaRegistros.innerHTML = state.records
+    .map((item) => {
+      return `
         <tr>
-          <td colspan="8" class="empty">No se encontraron registros.</td>
+          <td><strong>${escapeHtml(item.id)}</strong></td>
+          <td>${escapeHtml(item.fecha)}</td>
+          <td>${escapeHtml(item.cliente)}</td>
+          <td>${escapeHtml(item.grupo || item.groupKey || "")}</td>
+          <td>${escapeHtml(item.nombre || item.usuario)}</td>
+          <td><span class="badge">${escapeHtml(item.estado)}</span></td>
+          <td>${escapeHtml(item.comentario || "")}</td>
+          <td>
+            <button type="button" class="edit-btn" data-id="${escapeHtml(item.id)}" title="Editar registro">
+              ✏️
+            </button>
+          </td>
         </tr>
       `;
-      updateStats();
-      return;
-    }
+    })
+    .join("");
 
-    tablaRegistros.innerHTML = state.records
-      .map((item) => {
-        return `
-          <tr>
-            <td><strong>${escapeHtml(item.id)}</strong></td>
-            <td>${escapeHtml(item.fecha)}</td>
-            <td>${escapeHtml(item.cliente)}</td>
-            <td>${escapeHtml(item.grupo || item.groupKey || "")}</td>
-            <td>${escapeHtml(item.nombre || item.usuario)}</td>
-            <td><span class="badge">${escapeHtml(item.estado)}</span></td>
-            <td>${escapeHtml(item.comentario || "")}</td>
-            <td>${escapeHtml(item.sheetName || "")}</td>
-          </tr>
-        `;
-      })
-      .join("");
+  updateStats();
+}
 
-    updateStats();
-  }
 
   function resetModalScroll() {
     if (!modalRegistro) return;
@@ -594,27 +600,118 @@ async function scanLoop() {
     if (modalBody) modalBody.scrollTop = 0;
   }
 
-  function openModal() {
-    if (!formRegistro || !camposDinamicos || !modalRegistro) return;
+function buildEditFields(campos) {
+  const entries = Object.entries(campos || {});
+
+  if (!entries.length) {
+    return `<div class="hint">Este registro no tiene campos editables.</div>`;
+  }
+
+  return entries
+    .map(([campo, valor], index) => {
+      const campoNorm = normalize(campo);
+      const id = `edit_campo_${index}`;
+      const isFecha = campoNorm === "FECHA";
+      const isUsuario = campoNorm === "USUARIO";
+
+      return `
+        <div class="field">
+          <label for="${id}">${escapeHtml(campo)}</label>
+          <input
+            type="text"
+            id="${id}"
+            class="lote-field"
+            data-name="${escapeHtml(campo)}"
+            value="${escapeHtml(valor)}"
+            ${isFecha || isUsuario ? "readonly" : ""}
+          />
+        </div>
+      `;
+    })
+    .join("");
+}
+
+async function openEditModal(id) {
+  if (!id) return;
+
+  try {
+    showPageLoader("Cargando registro...");
+    const rec = await apiPostTimed("getLoteRecord", { token, id }, 15000);
+    hidePageLoader();
+
+    editingId = rec.id;
+
     formRegistro.reset();
-        camposDinamicos.innerHTML = `
-      <div class="hint">
-        Seleccione un cliente para cargar los campos correspondientes.
-      </div>
-    `;
+
+    // Cliente fijo (no editable)
+    fillSelect(clienteRegistro, [rec.cliente], rec.cliente);
+    clienteRegistro.value = rec.cliente;
+    clienteRegistro.disabled = true;
+
+    camposDinamicos.innerHTML = buildEditFields(rec.campos || rec.datos || {});
+    if (comentarioRegistro) comentarioRegistro.value = rec.comentario || "";
+
+    const title = modalRegistro.querySelector(".modal-head h2");
+    if (title) title.textContent = `Editar ${rec.id}`;
+
+    if (btnGuardarRegistro) btnGuardarRegistro.textContent = "Guardar cambios";
 
     document.body.classList.add("modal-open");
     modalRegistro.classList.add("is-open");
     modalRegistro.setAttribute("aria-hidden", "false");
     setTimeout(resetModalScroll, 50);
+  } catch (error) {
+    hidePageLoader();
+    console.error("Error abriendo edición:", error);
+    showToast(error.message || "No se pudo cargar el registro.", "error");
+  }
+}
+
+
+function openModal() {
+  if (!formRegistro || !camposDinamicos || !modalRegistro) return;
+
+  editingId = null;
+
+  if (clienteRegistro) {
+    clienteRegistro.disabled = false;
+    fillSelect(clienteRegistro, state.meta.clientes, "Seleccione cliente");
   }
 
-  function closeModal() {
-    if (!modalRegistro) return;
-    modalRegistro.classList.remove("is-open");
-    modalRegistro.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("modal-open");
+  formRegistro.reset();
+
+  const title = modalRegistro.querySelector(".modal-head h2");
+  if (title) title.textContent = "Toma de Lotes";
+  if (btnGuardarRegistro) btnGuardarRegistro.textContent = "Guardar Registro";
+
+  camposDinamicos.innerHTML = `
+    <div class="hint">
+      Seleccione un cliente para cargar los campos correspondientes.
+    </div>
+  `;
+
+  document.body.classList.add("modal-open");
+  modalRegistro.classList.add("is-open");
+  modalRegistro.setAttribute("aria-hidden", "false");
+
+  setTimeout(resetModalScroll, 50);
+}
+
+
+function closeModal() {
+  if (!modalRegistro) return;
+
+  modalRegistro.classList.remove("is-open");
+  modalRegistro.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+
+  editingId = null;
+
+  if (clienteRegistro) {
+    clienteRegistro.disabled = false;
   }
+}
+
 
   function renderDynamicFields(cliente) {
     if (!camposDinamicos) return;
@@ -722,39 +819,69 @@ async function scanLoop() {
     return campos;
   }
 
-  async function saveRecord(event) {
-    event.preventDefault();
+async function saveRecord(event) {
+  event.preventDefault();
 
-    const cliente = clienteRegistro ? clienteRegistro.value : "";
-
-    if (!cliente) {
-      showToast("Seleccione un cliente.", "error");
-      return;
-    }
-
+  // MODO EDICIÓN
+  if (editingId) {
     const campos = collectFields();
 
     try {
       setButtonLoading(btnGuardarRegistro, "Guardando...", true);
 
-      const res = await apiPostTimed("createLoteRecord", {
+      await apiPostTimed("updateLoteRecord", {
         token,
-        cliente,
+        id: editingId,
         campos,
         comentario: comentarioRegistro ? comentarioRegistro.value.trim() : ""
       }, 20000);
 
-      showToast(`Registro ${res.id} guardado correctamente en ${res.sheetName}.`, "ok");
+      showToast(`Registro ${editingId} actualizado correctamente.`, "ok");
 
       closeModal();
       await loadRecords("Actualizando registros...");
     } catch (error) {
-      console.error("Error guardando registro:", error);
-      showToast(error.message || "No se pudo guardar el registro.", "error");
+      console.error("Error actualizando registro:", error);
+      showToast(error.message || "No se pudo actualizar el registro.", "error");
     } finally {
-      setButtonLoading(btnGuardarRegistro, "Guardar Registro", false);
+      setButtonLoading(btnGuardarRegistro, "Guardar cambios", false);
     }
+
+    return;
   }
+
+  // MODO NUEVO
+  const cliente = clienteRegistro ? clienteRegistro.value : "";
+
+  if (!cliente) {
+    showToast("Seleccione un cliente.", "error");
+    return;
+  }
+
+  const campos = collectFields();
+
+  try {
+    setButtonLoading(btnGuardarRegistro, "Guardando...", true);
+
+    const res = await apiPostTimed("createLoteRecord", {
+      token,
+      cliente,
+      campos,
+      comentario: comentarioRegistro ? comentarioRegistro.value.trim() : ""
+    }, 20000);
+
+    showToast(`Registro ${res.id} guardado correctamente en ${res.sheetName}.`, "ok");
+
+    closeModal();
+    await loadRecords("Actualizando registros...");
+  } catch (error) {
+    console.error("Error guardando registro:", error);
+    showToast(error.message || "No se pudo guardar el registro.", "error");
+  } finally {
+    setButtonLoading(btnGuardarRegistro, "Guardar Registro", false);
+  }
+}
+
 
   function safeSheetName(name) {
     return String(name || "Hoja")
@@ -904,6 +1031,14 @@ function applyAutoFilter(ws, headers, rowCount) {
         event.preventDefault();
       }
     });
+document.addEventListener("click", (event) => {
+  const editButton = event.target.closest(".edit-btn");
+  if (!editButton) return;
+
+  const id = editButton.dataset.id;
+  openEditModal(id);
+});
+
   }
 
   if (clienteRegistro) {
