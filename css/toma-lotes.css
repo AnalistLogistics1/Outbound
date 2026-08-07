@@ -816,4 +816,23 @@ body.scanner-open {
     min-height: 340px;
   }
 }
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #eaf4ff;
+  font-size: 18px;
+  line-height: 1;
+  transition: 0.15s ease;
+}
+
+.edit-btn:hover {
+  background: #d3e7ff;
+  transform: translateY(-1px);
+}
 
