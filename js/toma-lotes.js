@@ -324,30 +324,66 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  async function scanLoop() {
-    if (!scannerRunning || scanLocked || !barcodeDetector || !scanVideo) {
-      return;
+function pickCodeInsideFrame(codes) {
+  const vw = scanVideo.videoWidth || 0;
+  const vh = scanVideo.videoHeight || 0;
+
+  if (!vw || !vh) {
+    return codes[0] || null;
+  }
+
+  // Zona central que coincide aprox. con el recuadro visual (88% ancho, 34% alto)
+  const zoneLeft = vw * 0.06;
+  const zoneRight = vw * 0.94;
+  const zoneTop = vh * 0.33;
+  const zoneBottom = vh * 0.67;
+
+  for (const code of codes) {
+    const box = code.boundingBox;
+    if (!box) continue;
+
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    if (cx >= zoneLeft && cx <= zoneRight && cy >= zoneTop && cy <= zoneBottom) {
+      return code;
     }
+  }
 
-    try {
-      if (scanVideo.readyState >= 2) {
-        const codes = await barcodeDetector.detect(scanVideo);
+  return null;
+}
 
-        if (codes && codes.length) {
-          const value = String(codes[0].rawValue || "").trim();
 
+async function scanLoop() {
+  if (!scannerRunning || scanLocked || !barcodeDetector || !scanVideo) {
+    return;
+  }
+
+  try {
+    if (scanVideo.readyState >= 2) {
+      const codes = await barcodeDetector.detect(scanVideo);
+
+      if (codes && codes.length) {
+        const valid = pickCodeInsideFrame(codes);
+
+        if (valid) {
+          const value = String(valid.rawValue || "").trim();
           if (value) {
             onBarcodeDetected(value);
             return;
           }
+        } else {
+          setScannerMessage("Acerque el código al recuadro central.");
         }
       }
-    } catch (error) {
-      console.warn("Lectura en curso:", error);
     }
-
-    scanRafId = requestAnimationFrame(scanLoop);
+  } catch (error) {
+    console.warn("Lectura en curso:", error);
   }
+
+  scanRafId = requestAnimationFrame(scanLoop);
+}
+
 
   function onBarcodeDetected(value) {
     if (scanLocked) return;
