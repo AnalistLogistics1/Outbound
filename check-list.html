@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check List | Outbound</title>
+
+  <link rel="stylesheet" href="./part/cabecera.css">
+  <link rel="stylesheet" href="./part/footer.css">
+  <link rel="stylesheet" href="./css/check-list.css">
+
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#072B5C">
+  <link rel="icon" type="image/png" href="./img/logo.png">
+</head>
+<body>
+  <div id="contenedor-cabecera"></div>
+
+  <main class="check-page">
+    <section class="check-hero">
+      <div>
+        <span class="chip">Módulo operativo</span>
+        <h1>Check List de Exportación</h1>
+        <p>Registre la verificación de insumos o área para el alistamiento de exportación.</p>
+      </div>
+
+      <button type="button" id="volverBtn" class="btn-secondary">Volver al menú</button>
+    </section>
+
+    <section class="check-card">
+      <div class="tabs">
+        <button type="button" class="tab active" data-type="INSUMOS">Check List de Insumos</button>
+        <button type="button" class="tab" data-type="AREA">Check List de Área</button>
+      </div>
+
+      <form id="checkForm" novalidate>
+        <div class="form-grid">
+          <div class="field">
+            <label>Fecha</label>
+            <input type="text" id="fechaChecklist" readonly>
+          </div>
+
+          <div class="field">
+            <label>N° de Expo</label>
+            <input type="text" id="nExpo" maxlength="3" placeholder="Ejemplo: 001">
+          </div>
+
+          <div class="field field-area-only hidden">
+            <label>Ubicación</label>
+            <select id="ubicacion"></select>
+          </div>
+
+          <div class="field">
+            <label>País</label>
+            <select id="pais"></select>
+          </div>
+
+          <div class="field">
+            <label>Responsable</label>
+            <select id="responsable"></select>
+          </div>
+        </div>
+
+        <div class="section-title" id="sectionTitle">
+          Verificación del estado y disponibilidad de los insumos
+        </div>
+
+        <div id="questionsContainer" class="questions"></div>
+
+        <div id="formMessage" class="form-message"></div>
+
+        <div class="actions">
+          <button type="button" id="limpiarBtn" class="btn-secondary">Limpiar</button>
+          <button type="submit" id="guardarBtn" class="btn-primary">Guardar registro</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./part/footer.js"></script>
+  <script src="./part/cabecera.js"></script>
+  <script src="./js/check-list.js"></script>
+  <script src="./pwa.js"></script>
+</body>
+</html>
