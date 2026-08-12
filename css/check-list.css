@@ -360,3 +360,17 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.btn-excel .excel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1d6f42;
+  font-weight: 900;
+  font-size: 13px;
+}
+
