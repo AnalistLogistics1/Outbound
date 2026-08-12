@@ -412,17 +412,18 @@ function collectResponses() {
     limpiarBtn.addEventListener("click", resetForm);
   }
 
-  if (volverBtn) {
-    volverBtn.addEventListener("click", () => {
-      window.location.href = typeof getMenuUrl === "function"
-        ? getMenuUrl()
-        : "./Menu-Opciones/menu.html";
+if (volverBtn) {
+  volverBtn.addEventListener("click", () => {
+    window.location.href = typeof getMenuUrl === "function"
+      ? getMenuUrl()
+      : "./Menu-Opciones/menu.html";
+  });
+}
+
 if (exportarBtn) {
   exportarBtn.addEventListener("click", exportarExcel);
 }
 
-    });
-  }
 
 if (checkForm) {
   checkForm.addEventListener("submit", async (event) => {
