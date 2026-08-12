@@ -99,7 +99,57 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loadingOverlay = document.getElementById("loadingOverlay");
   const loadingText = document.getElementById("loadingText");
   const loadingCard = document.getElementById("loadingCard");
+  const exportarBtn = document.getElementById("exportarBtn");
+function sheetNameSafe(name) {
+  return String(name || "Hoja").replace(/[\/?*[\]:]/g, "_").slice(0, 31);
+}
 
+async function exportarExcel() {
+  if (typeof XLSX === "undefined") {
+    setMessage("No se encontró la librería XLSX. Verifique el script en el HTML.", "error");
+    return;
+  }
+
+  try {
+    showLoading("Generando Excel...");
+
+    const data = await callApi("exportChecklistData");
+
+    const insumos = Array.isArray(data.insumos) ? data.insumos : [];
+    const area = Array.isArray(data.area) ? data.area : [];
+
+    if (!insumos.length && !area.length) {
+      hideLoading();
+      setMessage("No hay datos para exportar.", "error");
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    if (insumos.length) {
+      const wsInsumos = XLSX.utils.aoa_to_sheet(insumos);
+      XLSX.utils.book_append_sheet(wb, wsInsumos, sheetNameSafe("CHECKLIST_INSUMOS"));
+    }
+
+    if (area.length) {
+      const wsArea = XLSX.utils.aoa_to_sheet(area);
+      XLSX.utils.book_append_sheet(wb, wsArea, sheetNameSafe("CHECKLIST_AREA"));
+    }
+
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+    XLSX.writeFile(wb, `CheckList_${stamp}.xlsx`, { compression: true });
+
+    hideLoading();
+    setMessage("Excel generado correctamente.", "success");
+
+  } catch (error) {
+    hideLoading();
+    console.error("Error exportando Excel:", error);
+    setMessage(error.message || "No se pudo generar el Excel.", "error");
+  }
+}
+
+  
 function formatNow() {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
