@@ -96,6 +96,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const guardarBtn = document.getElementById("guardarBtn");
   const limpiarBtn = document.getElementById("limpiarBtn");
   const volverBtn = document.getElementById("volverBtn");
+  const loadingOverlay = document.getElementById("loadingOverlay");
+  const loadingText = document.getElementById("loadingText");
 
   function formatNow() {
     const now = new Date();
@@ -346,46 +348,60 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  if (checkForm) {
-    checkForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
+if (checkForm) {
+  checkForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
-      try {
-        setMessage("");
-        validateForm();
+    try {
+      setMessage("");
+      validateForm();
 
-        const payload = {
-          tipo: currentType,
-          fechaChecklist: fechaChecklist ? fechaChecklist.value : formatNow(),
-          nExpo: nExpo.value.trim(),
-          pais: pais.value,
-          responsable: responsable.value,
-          ubicacion: ubicacion ? ubicacion.value : "",
-          respuestas: collectResponses()
-        };
+      const payload = {
+        tipo: currentType,
+        fechaChecklist: fechaChecklist ? fechaChecklist.value : formatNow(),
+        nExpo: nExpo.value.trim(),
+        pais: pais.value,
+        responsable: responsable.value,
+        ubicacion: ubicacion ? ubicacion.value : "",
+        respuestas: collectResponses()
+      };
 
-        if (guardarBtn) {
-          guardarBtn.disabled = true;
-          guardarBtn.textContent = "Guardando...";
-        }
-
-        const result = await callApi("createChecklistRecord", payload);
-
-        setMessage(`Registro guardado correctamente. ID: ${result.id || ""}`, "success");
-        resetForm();
-        renderQuestions();
-
-      } catch (error) {
-        console.error("Error guardando Check List:", error);
-        setMessage(error.message || "No se pudo guardar el registro.", "error");
-      } finally {
-        if (guardarBtn) {
-          guardarBtn.disabled = false;
-          guardarBtn.textContent = "Guardar registro";
-        }
+      if (guardarBtn) {
+        guardarBtn.disabled = true;
+        guardarBtn.textContent = "Guardando...";
       }
-    });
-  }
+
+      showLoading("Guardando registro...");
+
+      const result = await callApi("createChecklistRecord", payload);
+
+      hideLoading();
+
+      setMessage(`Registro guardado correctamente. ID: ${result.id || ""}`, "success");
+      resetForm();
+      renderQuestions();
+
+    } catch (error) {
+      hideLoading();
+      console.error("Error guardando Check List:", error);
+      setMessage(error.message || "No se pudo guardar el registro.", "error");
+    } finally {
+      if (guardarBtn) {
+        guardarBtn.disabled = false;
+        guardarBtn.textContent = "Guardar registro";
+      }
+    }
+  });
+}
+
+function showLoading(message) {
+  if (loadingText) loadingText.textContent = message || "Guardando registro...";
+  if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+}
+
+function hideLoading() {
+  if (loadingOverlay) loadingOverlay.classList.add("hidden");
+}
 
   async function init() {
     setInitialLocalData();
