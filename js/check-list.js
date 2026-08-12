@@ -2,18 +2,86 @@ document.addEventListener("DOMContentLoaded", async () => {
   requireAuth();
 
   const token = getToken();
-  const user = getUser();
-
   let currentType = "INSUMOS";
 
-  let meta = {
-    serverNow: "",
-    paises: [],
-    responsables: [],
-    ubicaciones: [],
-    insumos: [],
-    area: []
+  const DEFAULT_META = {
+    paises: [
+      "EEUU",
+      "COLOMBIA",
+      "COSTA RICA",
+      "CHILE",
+      "ECUADOR",
+      "PANAMA",
+      "BRASIL",
+      "MEXICO",
+      "ARGENTINA"
+    ],
+    responsables: [
+      "Juan Antonio Espinoza",
+      "Jose Luis Perez"
+    ],
+    ubicaciones: [
+      "FRENTE DE RAMPA 1",
+      "FRENTE DE RAMPA 12",
+      "STAGE MEDICO"
+    ],
+    insumos: [
+      {
+        key: "STRETCH_FILM",
+        label: "STRECH FILM",
+        pregunta: "¿El stretch film se encuentra en buen estado?"
+      },
+      {
+        key: "ZUNCHOS",
+        label: "ZUNCHOS",
+        pregunta: "¿Los zunchos se encuentran en buen estado?"
+      },
+      {
+        key: "PALLETS",
+        label: "PALLETS",
+        pregunta: "¿Los pallets se encuentran en condiciones adecuadas para su uso?"
+      },
+      {
+        key: "GRAPAS",
+        label: "GRAPAS",
+        pregunta: "¿Las grapas se encuentran en buen estado?"
+      },
+      {
+        key: "ESQUINEROS",
+        label: "ESQUINEROS",
+        pregunta: "¿Los esquineros se encuentran en buen estado?"
+      }
+    ],
+    area: [
+      {
+        key: "PREGUNTA_1",
+        label: "1",
+        pregunta: "¿El área de alistamiento para exportación está claramente delimitada e identificada?"
+      },
+      {
+        key: "PREGUNTA_2",
+        label: "2",
+        pregunta: "¿El área está libre de materiales, equipos y productos ajenos a la operación de exportación?"
+      },
+      {
+        key: "PREGUNTA_3",
+        label: "3",
+        pregunta: "¿El área se encuentra limpia y ordenada?"
+      },
+      {
+        key: "PREGUNTA_4",
+        label: "4",
+        pregunta: "¿Los insumos requeridos para el alistamiento de exportación están disponibles?"
+      },
+      {
+        key: "PREGUNTA_5",
+        label: "5",
+        pregunta: "¿Las condiciones del área permiten realizar el alistamiento de manera segura y conforme a los procedimientos establecidos?"
+      }
+    ]
   };
+
+  let meta = { ...DEFAULT_META };
 
   const fechaChecklist = document.getElementById("fechaChecklist");
   const nExpo = document.getElementById("nExpo");
@@ -27,6 +95,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const guardarBtn = document.getElementById("guardarBtn");
   const limpiarBtn = document.getElementById("limpiarBtn");
   const volverBtn = document.getElementById("volverBtn");
+
+  function formatNow() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mi = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -42,19 +121,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       throw new Error("No se encontró token de sesión.");
     }
 
-    if (typeof apiPost !== "function") {
-      throw new Error("No se encontró apiPost. Verifique que js/api.js cargue antes de check-list.js.");
-    }
-
     return await apiPost(action, {
-      ...payload,
-      token
+      token,
+      ...payload
     });
   }
 
   function setMessage(message, type = "") {
     if (!formMessage) return;
-
     formMessage.textContent = message || "";
     formMessage.className = `form-message${type ? " " + type : ""}`;
   }
@@ -64,7 +138,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>`;
 
-    (items || []).forEach((item) => {
+    items.forEach((item) => {
       const option = document.createElement("option");
       option.value = item;
       option.textContent = item;
@@ -72,55 +146,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  function setButtonLoading(isLoading) {
-    if (!guardarBtn) return;
+  function mergeMetaFromApi(data) {
+    data = data || {};
 
-    guardarBtn.disabled = isLoading;
-    guardarBtn.textContent = isLoading ? "Guardando..." : "Guardar registro";
+    meta = {
+      serverNow: data.serverNow || formatNow(),
+      paises: Array.isArray(data.paises) && data.paises.length ? data.paises : DEFAULT_META.paises,
+      responsables: Array.isArray(data.responsables) && data.responsables.length ? data.responsables : DEFAULT_META.responsables,
+      ubicaciones: Array.isArray(data.ubicaciones) && data.ubicaciones.length ? data.ubicaciones : DEFAULT_META.ubicaciones,
+      insumos: Array.isArray(data.insumos) && data.insumos.length ? data.insumos : DEFAULT_META.insumos,
+      area: Array.isArray(data.area) && data.area.length ? data.area : DEFAULT_META.area
+    };
   }
 
   function renderQuestions() {
-    if (!questionsContainer) return;
-
     questionsContainer.innerHTML = "";
 
     const isInsumos = currentType === "INSUMOS";
-    const items = isInsumos ? meta.insumos || [] : meta.area || [];
+    const items = isInsumos ? meta.insumos : meta.area;
 
-    if (sectionTitle) {
-      sectionTitle.textContent = isInsumos
-        ? "Verificación del estado y disponibilidad de los insumos de embalaje para exportación"
-        : "Verificar la zona de preparación para el alistamiento de mercadería de exportación";
-    }
+    sectionTitle.textContent = isInsumos
+      ? "VERIFICACIÓN DEL ESTADO Y DISPONIBILIDAD DE LOS INSUMOS"
+      : "VERIFICAR LA ZONA DE PREPARACIÓN PARA EL ALISTAMIENTO DE MERCADERÍA DE EXPORTACIÓN";
 
     document.querySelectorAll(".field-area-only").forEach((el) => {
       el.classList.toggle("hidden", isInsumos);
     });
 
-    if (!items.length) {
-      questionsContainer.innerHTML = `
-        <div class="question-card">
-          <div class="question-left">
-            <div class="question-text">
-              No se encontraron preguntas configuradas para este Check List.
-            </div>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
     items.forEach((item, index) => {
-      const key = String(item.key || "").trim();
-
-      if (!key) return;
-
-      const label = isInsumos
-        ? String(item.label || key)
-        : `PREGUNTA ${index + 1}`;
-
-      const pregunta = String(item.pregunta || "").trim();
-
+      const key = item.key;
+      const label = isInsumos ? item.label : String(index + 1);
       const yesLabel = isInsumos ? "CONFORME" : "SI";
       const noLabel = isInsumos ? "NO CONFORME" : "NO";
 
@@ -130,7 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       card.innerHTML = `
         <div class="question-left">
           <div class="question-badge">${escapeHtml(label)}</div>
-          <div class="question-text">${escapeHtml(pregunta)}</div>
+          <div class="question-text">${escapeHtml(item.pregunta)}</div>
         </div>
 
         <div class="question-options">
@@ -146,12 +201,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
 
         <div class="comment-box">
-          <input
-            type="text"
-            data-comment="${escapeHtml(key)}"
-            maxlength="150"
-            placeholder="Comentario"
-          >
+          <input type="text" data-comment="${escapeHtml(key)}" maxlength="150" placeholder="Comentario">
         </div>
       `;
 
@@ -160,6 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function resetForm() {
+    if (fechaChecklist) fechaChecklist.value = formatNow();
     if (nExpo) nExpo.value = "";
     if (ubicacion) ubicacion.value = "";
     if (pais) pais.value = "";
@@ -178,53 +229,46 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   function collectResponses() {
     const respuestas = {};
-    const items = currentType === "INSUMOS" ? meta.insumos || [] : meta.area || [];
+    const items = currentType === "INSUMOS" ? meta.insumos : meta.area;
 
     for (const item of items) {
-      const key = String(item.key || "").trim();
-
-      if (!key) continue;
-
-      const radios = Array.from(document.getElementsByName(key));
-      const selected = radios.find((radio) => radio.checked);
-      const commentInput = document.querySelector(`[data-comment="${key}"]`);
+      const selected = document.querySelector(`input[name="${item.key}"]:checked`);
+      const comment = document.querySelector(`[data-comment="${item.key}"]`);
 
       if (!selected) {
-        throw new Error(`Debe responder: ${item.pregunta || key}`);
+        throw new Error(`Debe responder: ${item.pregunta}`);
       }
 
-      if (currentType === "INSUMOS") {
-        respuestas[key] = {
-          estado: selected.value,
-          comentario: commentInput ? commentInput.value.trim() : ""
-        };
-      } else {
-        respuestas[key] = {
-          respuesta: selected.value,
-          comentario: commentInput ? commentInput.value.trim() : ""
-        };
-      }
+      respuestas[item.key] = currentType === "INSUMOS"
+        ? {
+            estado: selected.value,
+            comentario: comment ? comment.value.trim() : ""
+          }
+        : {
+            respuesta: selected.value,
+            comentario: comment ? comment.value.trim() : ""
+          };
     }
 
     return respuestas;
   }
 
   function validateForm() {
-    const expoValue = nExpo ? nExpo.value.trim() : "";
+    const expoValue = nExpo.value.trim();
 
     if (!/^\d{3}$/.test(expoValue)) {
       throw new Error("El N° de Expo debe tener exactamente 3 dígitos.");
     }
 
-    if (!pais || !pais.value) {
+    if (!pais.value) {
       throw new Error("Debe seleccionar un país.");
     }
 
-    if (!responsable || !responsable.value) {
+    if (!responsable.value) {
       throw new Error("Debe seleccionar un responsable.");
     }
 
-    if (currentType === "AREA" && (!ubicacion || !ubicacion.value)) {
+    if (currentType === "AREA" && !ubicacion.value) {
       throw new Error("Debe seleccionar una ubicación.");
     }
   }
@@ -236,7 +280,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
 
       tab.classList.add("active");
-
       currentType = tab.dataset.type || "INSUMOS";
 
       resetForm();
@@ -256,11 +299,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (volverBtn) {
     volverBtn.addEventListener("click", () => {
-      if (typeof getMenuUrl === "function") {
-        window.location.href = getMenuUrl();
-      } else {
-        window.location.href = "./Menu-Opciones/menu.html";
-      }
+      window.location.href = typeof getMenuUrl === "function"
+        ? getMenuUrl()
+        : "./Menu-Opciones/menu.html";
     });
   }
 
@@ -274,6 +315,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const payload = {
           tipo: currentType,
+          fechaChecklist: fechaChecklist.value,
           nExpo: nExpo.value.trim(),
           pais: pais.value,
           responsable: responsable.value,
@@ -281,44 +323,38 @@ document.addEventListener("DOMContentLoaded", async () => {
           respuestas: collectResponses()
         };
 
-        setButtonLoading(true);
+        guardarBtn.disabled = true;
+        guardarBtn.textContent = "Guardando...";
 
         const result = await callApi("createChecklistRecord", payload);
 
-        setMessage(
-          `Registro guardado correctamente. ID: ${result.id || ""}`,
-          "success"
-        );
-
+        setMessage(`Registro guardado correctamente. ID: ${result.id || ""}`, "success");
         resetForm();
 
       } catch (error) {
         console.error("Error guardando Check List:", error);
         setMessage(error.message || "No se pudo guardar el registro.", "error");
       } finally {
-        setButtonLoading(false);
+        guardarBtn.disabled = false;
+        guardarBtn.textContent = "Guardar registro";
       }
     });
   }
 
   async function init() {
+    fechaChecklist.value = formatNow();
+
+    fillSelect(pais, DEFAULT_META.paises, "Seleccione país");
+    fillSelect(responsable, DEFAULT_META.responsables, "Seleccione responsable");
+    fillSelect(ubicacion, DEFAULT_META.ubicaciones, "Seleccione ubicación");
+
+    renderQuestions();
+
     try {
-      setMessage("Cargando Check List...");
-
       const data = await callApi("getChecklistMeta");
+      mergeMetaFromApi(data);
 
-      meta = {
-        serverNow: data.serverNow || "",
-        paises: data.paises || [],
-        responsables: data.responsables || [],
-        ubicaciones: data.ubicaciones || [],
-        insumos: data.insumos || [],
-        area: data.area || []
-      };
-
-      if (fechaChecklist) {
-        fechaChecklist.value = meta.serverNow || "";
-      }
+      fechaChecklist.value = meta.serverNow || formatNow();
 
       fillSelect(pais, meta.paises, "Seleccione país");
       fillSelect(responsable, meta.responsables, "Seleccione responsable");
@@ -327,11 +363,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderQuestions();
       setMessage("");
 
-      console.log("Check List iniciado correctamente para:", user?.usuario || user?.nombre || "Usuario");
+      console.log("Check List cargado correctamente.");
 
     } catch (error) {
-      console.error("Error inicializando Check List:", error);
-      setMessage(error.message || "No se pudo cargar el módulo Check List.", "error");
+      console.warn("No se pudo cargar metadata desde Apps Script. Se usan valores locales:", error);
+      setMessage("Se cargaron valores locales. Verifique Apps Script si no permite guardar.", "error");
     }
   }
 
