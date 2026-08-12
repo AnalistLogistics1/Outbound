@@ -189,59 +189,66 @@ function formatNow() {
     };
   }
 
-  function renderQuestions() {
-    if (!questionsContainer) return;
+function renderQuestions() {
+  if (!questionsContainer) return;
 
-    questionsContainer.innerHTML = "";
+  questionsContainer.innerHTML = "";
 
-    const isInsumos = currentType === "INSUMOS";
-    const items = isInsumos ? meta.insumos : meta.area;
+  const isInsumos = currentType === "INSUMOS";
+  const items = isInsumos ? meta.insumos : meta.area;
 
-    if (sectionTitle) {
-      sectionTitle.textContent = isInsumos
-        ? "VERIFICACIÓN DEL ESTADO Y DISPONIBILIDAD DE LOS INSUMOS"
-        : "VERIFICAR LA ZONA DE PREPARACIÓN PARA EL ALISTAMIENTO DE MERCADERÍA DE EXPORTACIÓN";
-    }
-
-    document.querySelectorAll(".field-area-only").forEach((el) => {
-      el.classList.toggle("hidden", isInsumos);
-    });
-
-    items.forEach((item, index) => {
-      const key = item.key;
-      const label = isInsumos ? item.label : String(index + 1);
-      const yesLabel = isInsumos ? "CONFORME" : "SI";
-      const noLabel = isInsumos ? "NO CONFORME" : "NO";
-
-      const card = document.createElement("div");
-      card.className = "question-card";
-
-      card.innerHTML = `
-        <div class="question-left">
-          <div class="question-badge">${escapeHtml(label)}</div>
-          <div class="question-text">${escapeHtml(item.pregunta)}</div>
-        </div>
-
-        <div class="question-options">
-          <label class="radio-option">
-            <input type="radio" name="${escapeHtml(key)}" value="${escapeHtml(yesLabel)}">
-            <span>${escapeHtml(yesLabel)}</span>
-          </label>
-
-          <label class="radio-option">
-            <input type="radio" name="${escapeHtml(key)}" value="${escapeHtml(noLabel)}">
-            <span>${escapeHtml(noLabel)}</span>
-          </label>
-        </div>
-
-        <div class="comment-box">
-          <input type="text" data-comment="${escapeHtml(key)}" maxlength="150" placeholder="Comentario">
-        </div>
-      `;
-
-      questionsContainer.appendChild(card);
-    });
+  if (sectionTitle) {
+    sectionTitle.textContent = isInsumos
+      ? "VERIFICACIÓN DEL ESTADO Y DISPONIBILIDAD DE LOS INSUMOS"
+      : "VERIFICAR LA ZONA DE PREPARACIÓN PARA EL ALISTAMIENTO DE MERCADERÍA DE EXPORTACIÓN";
   }
+
+  document.querySelectorAll(".field-area-only").forEach((el) => {
+    el.classList.toggle("hidden", isInsumos);
+  });
+
+  items.forEach((item, index) => {
+    const key = item.key;
+    const label = isInsumos ? item.label : String(index + 1);
+    const yesLabel = isInsumos ? "CONFORME" : "SI";
+    const noLabel = isInsumos ? "NO CONFORME" : "NO";
+
+    const card = document.createElement("div");
+    card.className = "question-card";
+
+    card.innerHTML = `
+      <div class="question-left">
+        <div class="question-badge">${escapeHtml(label)}</div>
+        <div class="question-text">${escapeHtml(item.pregunta)}</div>
+      </div>
+
+      <div class="question-options">
+        <label class="radio-option">
+          <input type="radio" name="${escapeHtml(key)}" value="${escapeHtml(yesLabel)}">
+          <span>${escapeHtml(yesLabel)}</span>
+        </label>
+
+        <label class="radio-option">
+          <input type="radio" name="${escapeHtml(key)}" value="${escapeHtml(noLabel)}">
+          <span>${escapeHtml(noLabel)}</span>
+        </label>
+      </div>
+
+      <div class="comment-box">
+        <input type="text" data-comment="${escapeHtml(key)}" maxlength="150" placeholder="Comentario">
+      </div>
+    `;
+
+    questionsContainer.appendChild(card);
+  });
+
+  // Fuera del forEach: limpia el borde rojo al escribir en el comentario
+  document.querySelectorAll("[data-comment]").forEach((input) => {
+    input.addEventListener("input", () => {
+      input.style.borderColor = "";
+    });
+  });
+}
 
   function resetForm() {
     setFechaActual();
@@ -262,31 +269,44 @@ function formatNow() {
     setMessage("");
   }
 
-  function collectResponses() {
-    const respuestas = {};
-    const items = currentType === "INSUMOS" ? meta.insumos : meta.area;
+function collectResponses() {
+  const respuestas = {};
+  const items = currentType === "INSUMOS" ? meta.insumos : meta.area;
 
-    for (const item of items) {
-      const selected = document.querySelector(`input[name="${item.key}"]:checked`);
-      const comment = document.querySelector(`[data-comment="${item.key}"]`);
+  const negativo = currentType === "INSUMOS" ? "NO CONFORME" : "NO";
 
-      if (!selected) {
-        throw new Error(`Debe responder: ${item.pregunta}`);
-      }
+  for (const item of items) {
+    const selected = document.querySelector(`input[name="${item.key}"]:checked`);
+    const comment = document.querySelector(`[data-comment="${item.key}"]`);
+    const comentarioValor = comment ? comment.value.trim() : "";
 
-      respuestas[item.key] = currentType === "INSUMOS"
-        ? {
-            estado: selected.value,
-            comentario: comment ? comment.value.trim() : ""
-          }
-        : {
-            respuesta: selected.value,
-            comentario: comment ? comment.value.trim() : ""
-          };
+    if (!selected) {
+      throw new Error(`Debe responder: ${item.pregunta}`);
     }
 
-    return respuestas;
+    // Comentario obligatorio si la respuesta es negativa
+    if (selected.value === negativo && !comentarioValor) {
+      if (comment) {
+        comment.focus();
+        comment.style.borderColor = "#b91c1c";
+      }
+      throw new Error(`Debe ingresar un comentario en: ${item.label || item.pregunta}`);
+    }
+
+    respuestas[item.key] = currentType === "INSUMOS"
+      ? {
+          estado: selected.value,
+          comentario: comentarioValor
+        }
+      : {
+          respuesta: selected.value,
+          comentario: comentarioValor
+        };
   }
+
+  return respuestas;
+}
+
 
   function validateForm() {
     const expoValue = nExpo ? nExpo.value.trim() : "";
