@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Check List | Outbound</title>
+  <title>Check List | Control de Temperatura</title>
 
   <link rel="stylesheet" href="./part/cabecera.css">
   <link rel="stylesheet" href="./part/footer.css">
@@ -11,8 +11,10 @@
 
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#072B5C">
+  <link rel="apple-touch-icon" href="./img/logo.png">
   <link rel="icon" type="image/png" href="./img/logo.png">
 </head>
+
 <body>
   <div id="contenedor-cabecera"></div>
 
@@ -24,40 +26,59 @@
         <p>Registre la verificación de insumos o área para el alistamiento de exportación.</p>
       </div>
 
-      <button type="button" id="volverBtn" class="btn-secondary">Volver al menú</button>
+      <button type="button" id="volverBtn" class="btn-secondary">
+        Volver al menú
+      </button>
     </section>
 
     <section class="check-card">
       <div class="tabs">
-        <button type="button" class="tab active" data-type="INSUMOS">Check List de Insumos</button>
-        <button type="button" class="tab" data-type="AREA">Check List de Área</button>
+        <button type="button" class="tab active" data-type="INSUMOS">
+          Check List de Insumos
+        </button>
+
+        <button type="button" class="tab" data-type="AREA">
+          Check List de Área
+        </button>
       </div>
 
       <form id="checkForm" novalidate>
         <div class="form-grid">
           <div class="field">
-            <label>Fecha</label>
+            <label for="fechaChecklist">Fecha</label>
             <input type="text" id="fechaChecklist" readonly>
           </div>
 
           <div class="field">
-            <label>N° de Expo</label>
-            <input type="text" id="nExpo" maxlength="3" placeholder="Ejemplo: 001">
+            <label for="nExpo">N° de Expo</label>
+            <input
+              type="text"
+              id="nExpo"
+              maxlength="3"
+              inputmode="numeric"
+              placeholder="Ejemplo: 001"
+            >
           </div>
 
           <div class="field field-area-only hidden">
-            <label>Ubicación</label>
-            <select id="ubicacion"></select>
+            <label for="ubicacion">Ubicación</label>
+            <select id="ubicacion">
+              <option value="">Seleccione ubicación</option>
+            </select>
           </div>
 
           <div class="field">
-            <label>País</label>
-            <select id="pais"></select>
+            <label for="pais">País</label>
+            <select id="pais">
+              <option value="">Seleccione país</option>
+            </select>
           </div>
 
           <div class="field">
-            <label>Responsable</label>
-            <select id="responsable"></select>
+            <label for="responsable">Responsable</label>
+            <select id="responsable">
+              <option value="">Seleccione responsable</option>
+            </select>
           </div>
         </div>
 
@@ -70,8 +91,13 @@
         <div id="formMessage" class="form-message"></div>
 
         <div class="actions">
-          <button type="button" id="limpiarBtn" class="btn-secondary">Limpiar</button>
-          <button type="submit" id="guardarBtn" class="btn-primary">Guardar registro</button>
+          <button type="button" id="limpiarBtn" class="btn-secondary">
+            Limpiar
+          </button>
+
+          <button type="submit" id="guardarBtn" class="btn-primary">
+            Guardar registro
+          </button>
         </div>
       </form>
     </section>
