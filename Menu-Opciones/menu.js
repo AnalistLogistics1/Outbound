@@ -42,18 +42,29 @@ document.addEventListener("DOMContentLoaded", () => {
     return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
-  const apps = [
-    {
-      title: "Toma de Lotes",
-      desc: "Registro y seguimiento logístico de lotes por cliente.",
-      pill: "Módulo activo",
-      accent: "accent-blue",
-      image: resolveAsset("../img/toma-lotes.jpg"),
-      fallback: createThumb("TL", "#0f4c81", "#38bdf8", "Toma de lotes"),
-      icon: "TL",
-      url: "../toma-lotes.html"
-    }
-  ];
+const apps = [
+  {
+    title: "Toma de Lotes",
+    desc: "Registro y seguimiento logístico de lotes por cliente.",
+    pill: "Módulo activo",
+    accent: "accent-blue",
+    image: resolveAsset("../img/toma-lotes.jpg"),
+    fallback: createThumb("TL", "#0f4c81", "#38bdf8", "Toma de lotes"),
+    icon: "TL",
+    url: "../toma-lotes.html"
+  },
+  {
+    title: "Check List",
+    desc: "Registro de check list de insumos y área para alistamiento de exportación.",
+    pill: "Módulo activo",
+    accent: "accent-blue",
+    image: resolveAsset("../img/check-list.jpg"),
+    fallback: createThumb("CL", "#072B5C", "#f8b400", "Check List"),
+    icon: "CL",
+    url: "../check-list.html"
+  }
+];
+
 
   mensajeBienvenida.textContent = `Hola, ${user?.nombre || user?.username || user?.usuario || "Usuario"}.`;
   mensajeDescripcion.textContent = "Seleccione el módulo que desea utilizar hoy.";
