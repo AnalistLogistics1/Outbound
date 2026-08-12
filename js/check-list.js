@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   requireAuth();
 
   const token = getToken();
+
   let currentType = "INSUMOS";
 
   const DEFAULT_META = {
@@ -81,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]
   };
 
-  let meta = { ...DEFAULT_META };
+  let meta = JSON.parse(JSON.stringify(DEFAULT_META));
 
   const fechaChecklist = document.getElementById("fechaChecklist");
   const nExpo = document.getElementById("nExpo");
@@ -104,6 +105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const hh = String(now.getHours()).padStart(2, "0");
     const mi = String(now.getMinutes()).padStart(2, "0");
     const ss = String(now.getSeconds()).padStart(2, "0");
+
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
   }
 
@@ -116,19 +118,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       .replace(/'/g, "&#039;");
   }
 
-  async function callApi(action, payload = {}) {
-    if (!token) {
-      throw new Error("No se encontró token de sesión.");
-    }
-
-    return await apiPost(action, {
-      token,
-      ...payload
-    });
-  }
-
   function setMessage(message, type = "") {
     if (!formMessage) return;
+
     formMessage.textContent = message || "";
     formMessage.className = `form-message${type ? " " + type : ""}`;
   }
@@ -138,7 +130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>`;
 
-    items.forEach((item) => {
+    (items || []).forEach((item) => {
       const option = document.createElement("option");
       option.value = item;
       option.textContent = item;
@@ -146,28 +138,66 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function setFechaActual() {
+    if (fechaChecklist) {
+      fechaChecklist.value = formatNow();
+    }
+  }
+
+  async function callApi(action, payload = {}) {
+    if (!token) {
+      throw new Error("No se encontró token de sesión.");
+    }
+
+    if (typeof apiPost !== "function") {
+      throw new Error("No se encontró apiPost. Revise que js/api.js cargue antes de check-list.js.");
+    }
+
+    return await apiPost(action, {
+      token,
+      ...payload
+    });
+  }
+
   function mergeMetaFromApi(data) {
     data = data || {};
 
     meta = {
-      serverNow: data.serverNow || formatNow(),
-      paises: Array.isArray(data.paises) && data.paises.length ? data.paises : DEFAULT_META.paises,
-      responsables: Array.isArray(data.responsables) && data.responsables.length ? data.responsables : DEFAULT_META.responsables,
-      ubicaciones: Array.isArray(data.ubicaciones) && data.ubicaciones.length ? data.ubicaciones : DEFAULT_META.ubicaciones,
-      insumos: Array.isArray(data.insumos) && data.insumos.length ? data.insumos : DEFAULT_META.insumos,
-      area: Array.isArray(data.area) && data.area.length ? data.area : DEFAULT_META.area
+      paises: Array.isArray(data.paises) && data.paises.length
+        ? data.paises
+        : DEFAULT_META.paises,
+
+      responsables: Array.isArray(data.responsables) && data.responsables.length
+        ? data.responsables
+        : DEFAULT_META.responsables,
+
+      ubicaciones: Array.isArray(data.ubicaciones) && data.ubicaciones.length
+        ? data.ubicaciones
+        : DEFAULT_META.ubicaciones,
+
+      insumos: Array.isArray(data.insumos) && data.insumos.length
+        ? data.insumos
+        : DEFAULT_META.insumos,
+
+      area: Array.isArray(data.area) && data.area.length
+        ? data.area
+        : DEFAULT_META.area
     };
   }
 
   function renderQuestions() {
+    if (!questionsContainer) return;
+
     questionsContainer.innerHTML = "";
 
     const isInsumos = currentType === "INSUMOS";
     const items = isInsumos ? meta.insumos : meta.area;
 
-    sectionTitle.textContent = isInsumos
-      ? "VERIFICACIÓN DEL ESTADO Y DISPONIBILIDAD DE LOS INSUMOS"
-      : "VERIFICAR LA ZONA DE PREPARACIÓN PARA EL ALISTAMIENTO DE MERCADERÍA DE EXPORTACIÓN";
+    if (sectionTitle) {
+      sectionTitle.textContent = isInsumos
+        ? "VERIFICACIÓN DEL ESTADO Y DISPONIBILIDAD DE LOS INSUMOS"
+        : "VERIFICAR LA ZONA DE PREPARACIÓN PARA EL ALISTAMIENTO DE MERCADERÍA DE EXPORTACIÓN";
+    }
 
     document.querySelectorAll(".field-area-only").forEach((el) => {
       el.classList.toggle("hidden", isInsumos);
@@ -210,7 +240,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function resetForm() {
-    if (fechaChecklist) fechaChecklist.value = formatNow();
+    setFechaActual();
+
     if (nExpo) nExpo.value = "";
     if (ubicacion) ubicacion.value = "";
     if (pais) pais.value = "";
@@ -254,23 +285,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function validateForm() {
-    const expoValue = nExpo.value.trim();
+    const expoValue = nExpo ? nExpo.value.trim() : "";
 
     if (!/^\d{3}$/.test(expoValue)) {
       throw new Error("El N° de Expo debe tener exactamente 3 dígitos.");
     }
 
-    if (!pais.value) {
+    if (!pais || !pais.value) {
       throw new Error("Debe seleccionar un país.");
     }
 
-    if (!responsable.value) {
+    if (!responsable || !responsable.value) {
       throw new Error("Debe seleccionar un responsable.");
     }
 
-    if (currentType === "AREA" && !ubicacion.value) {
+    if (currentType === "AREA" && (!ubicacion || !ubicacion.value)) {
       throw new Error("Debe seleccionar una ubicación.");
     }
+  }
+
+  function setInitialLocalData() {
+    setFechaActual();
+
+    fillSelect(pais, DEFAULT_META.paises, "Seleccione país");
+    fillSelect(responsable, DEFAULT_META.responsables, "Seleccione responsable");
+    fillSelect(ubicacion, DEFAULT_META.ubicaciones, "Seleccione ubicación");
+
+    renderQuestions();
   }
 
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -315,7 +356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         const payload = {
           tipo: currentType,
-          fechaChecklist: fechaChecklist.value,
+          fechaChecklist: fechaChecklist ? fechaChecklist.value : formatNow(),
           nExpo: nExpo.value.trim(),
           pais: pais.value,
           responsable: responsable.value,
@@ -323,38 +364,40 @@ document.addEventListener("DOMContentLoaded", async () => {
           respuestas: collectResponses()
         };
 
-        guardarBtn.disabled = true;
-        guardarBtn.textContent = "Guardando...";
+        if (guardarBtn) {
+          guardarBtn.disabled = true;
+          guardarBtn.textContent = "Guardando...";
+        }
 
         const result = await callApi("createChecklistRecord", payload);
 
         setMessage(`Registro guardado correctamente. ID: ${result.id || ""}`, "success");
         resetForm();
+        renderQuestions();
 
       } catch (error) {
         console.error("Error guardando Check List:", error);
         setMessage(error.message || "No se pudo guardar el registro.", "error");
       } finally {
-        guardarBtn.disabled = false;
-        guardarBtn.textContent = "Guardar registro";
+        if (guardarBtn) {
+          guardarBtn.disabled = false;
+          guardarBtn.textContent = "Guardar registro";
+        }
       }
     });
   }
 
   async function init() {
-    fechaChecklist.value = formatNow();
+    setInitialLocalData();
 
-    fillSelect(pais, DEFAULT_META.paises, "Seleccione país");
-    fillSelect(responsable, DEFAULT_META.responsables, "Seleccione responsable");
-    fillSelect(ubicacion, DEFAULT_META.ubicaciones, "Seleccione ubicación");
-
-    renderQuestions();
+    setInterval(() => {
+      setFechaActual();
+    }, 1000);
 
     try {
       const data = await callApi("getChecklistMeta");
-      mergeMetaFromApi(data);
 
-      fechaChecklist.value = meta.serverNow || formatNow();
+      mergeMetaFromApi(data);
 
       fillSelect(pais, meta.paises, "Seleccione país");
       fillSelect(responsable, meta.responsables, "Seleccione responsable");
@@ -366,8 +409,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.log("Check List cargado correctamente.");
 
     } catch (error) {
-      console.warn("No se pudo cargar metadata desde Apps Script. Se usan valores locales:", error);
-      setMessage("Se cargaron valores locales. Verifique Apps Script si no permite guardar.", "error");
+      console.warn("No se pudo cargar metadata desde Apps Script. Se usan valores locales.", error);
+      setMessage("Se cargaron valores locales. Si no permite guardar, revise Apps Script.", "error");
     }
   }
 
