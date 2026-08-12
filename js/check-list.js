@@ -417,6 +417,10 @@ function collectResponses() {
       window.location.href = typeof getMenuUrl === "function"
         ? getMenuUrl()
         : "./Menu-Opciones/menu.html";
+if (exportarBtn) {
+  exportarBtn.addEventListener("click", exportarExcel);
+}
+
     });
   }
 
