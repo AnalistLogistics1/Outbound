@@ -390,9 +390,6 @@ await new Promise((resolve) => setTimeout(resolve, 1800));
 hideLoading();
 setMessage("Registro guardado correctamente. Puede iniciar un nuevo registro.", "success");
 
-}, 1600);
-
-
     } catch (error) {
       hideLoading();
       console.error("Error guardando Check List:", error);
