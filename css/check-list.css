@@ -308,3 +308,27 @@ body {
     transform: rotate(360deg);
   }
 }
+.loading-card.success .spinner {
+  display: none;
+}
+
+.loading-card .success-icon {
+  display: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 900;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-card.success .success-icon {
+  display: flex;
+}
+
+.loading-card.success p {
+  color: var(--success);
+}
