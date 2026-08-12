@@ -98,6 +98,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const volverBtn = document.getElementById("volverBtn");
   const loadingOverlay = document.getElementById("loadingOverlay");
   const loadingText = document.getElementById("loadingText");
+  const loadingCard = document.getElementById("loadingCard");
 
   function formatNow() {
     const now = new Date();
@@ -371,15 +372,20 @@ if (checkForm) {
         guardarBtn.textContent = "Guardando...";
       }
 
-      showLoading("Guardando registro...");
+showLoading("Guardando registro...");
 
-      const result = await callApi("createChecklistRecord", payload);
+const result = await callApi("createChecklistRecord", payload);
 
-      hideLoading();
+showSuccess(`Registro guardado correctamente. ID: ${result.id || ""}`);
 
-      setMessage(`Registro guardado correctamente. ID: ${result.id || ""}`, "success");
-      resetForm();
-      renderQuestions();
+resetForm();
+renderQuestions();
+
+setTimeout(() => {
+  hideLoading();
+  setMessage("Registro guardado correctamente. Puede iniciar un nuevo registro.", "success");
+}, 1600);
+
 
     } catch (error) {
       hideLoading();
@@ -396,12 +402,21 @@ if (checkForm) {
 
 function showLoading(message) {
   if (loadingText) loadingText.textContent = message || "Guardando registro...";
+  if (loadingCard) loadingCard.classList.remove("success");
+  if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+}
+
+function showSuccess(message) {
+  if (loadingText) loadingText.textContent = message || "Registro guardado correctamente.";
+  if (loadingCard) loadingCard.classList.add("success");
   if (loadingOverlay) loadingOverlay.classList.remove("hidden");
 }
 
 function hideLoading() {
   if (loadingOverlay) loadingOverlay.classList.add("hidden");
+  if (loadingCard) loadingCard.classList.remove("success");
 }
+
 
   async function init() {
     setInitialLocalData();
