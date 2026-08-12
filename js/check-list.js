@@ -100,17 +100,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loadingText = document.getElementById("loadingText");
   const loadingCard = document.getElementById("loadingCard");
 
-  function formatNow() {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, "0");
-    const dd = String(now.getDate()).padStart(2, "0");
-    const hh = String(now.getHours()).padStart(2, "0");
-    const mi = String(now.getMinutes()).padStart(2, "0");
-    const ss = String(now.getSeconds()).padStart(2, "0");
+function formatNow() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mi = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
 
-    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
-  }
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+}
+
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -376,14 +377,19 @@ showLoading("Guardando registro...");
 
 const result = await callApi("createChecklistRecord", payload);
 
-showSuccess(`Registro guardado correctamente. ID: ${result.id || ""}`);
+// Mostrar éxito dentro del overlay
+if (loadingText) loadingText.textContent = `✓ Registro guardado. ID: ${result.id || ""}`;
+if (loadingCard) loadingCard.classList.add("success");
 
 resetForm();
 renderQuestions();
 
-setTimeout(() => {
-  hideLoading();
-  setMessage("Registro guardado correctamente. Puede iniciar un nuevo registro.", "success");
+// Esperar y cerrar
+await new Promise((resolve) => setTimeout(resolve, 1800));
+
+hideLoading();
+setMessage("Registro guardado correctamente. Puede iniciar un nuevo registro.", "success");
+
 }, 1600);
 
 
