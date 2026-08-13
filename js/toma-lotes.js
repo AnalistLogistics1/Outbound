@@ -159,7 +159,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return (
       name === "SKU" ||
       name === "PEDIDO" ||
-      name === "CLIENTE_GB" ||
       name.includes("LOTE")
     );
   }
