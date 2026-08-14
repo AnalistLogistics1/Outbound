@@ -505,7 +505,8 @@ async function scanLoop() {
         token,
         cliente: filtroCliente ? filtroCliente.value : "",
         estado: filtroEstado ? filtroEstado.value : "",
-        fecha: filtroFecha ? filtroFecha.value : ""
+        fecha: formatDateFilterForApi(filtroFecha ? filtroFecha.value : "")
+
       }, 20000);
 
       renderRecords(res.rows || []);
@@ -525,24 +526,60 @@ async function scanLoop() {
     }
   }
 
-  function parseRecordDate(value) {
-    const raw = String(value || "").trim();
+function parseRecordDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
 
-    let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-    if (match) {
-      const [, y, m, d, h, mi, s] = match;
-      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
-    }
+  // Formato: 2026-08-14 11:52:35 o 2026-08-14 11:52
+  let match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
 
-    match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
-    if (match) {
-      const [, d, m, y, h, mi, s] = match;
-      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
-    }
-
-    const fallback = Date.parse(raw);
-    return Number.isNaN(fallback) ? 0 : fallback;
+  if (match) {
+    const [, y, m, d, h = "0", mi = "0", s = "0"] = match;
+    return new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(h),
+      Number(mi),
+      Number(s)
+    ).getTime();
   }
+
+  // Formato: 14/08/2026 11:52:35 o 14/08/2026 11:52
+  match = raw.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+
+  if (match) {
+    const [, d, m, y, h = "0", mi = "0", s = "0"] = match;
+    return new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      Number(h),
+      Number(mi),
+      Number(s)
+    ).getTime();
+  }
+
+  return 0;
+}
+function formatDateFilterForApi(value) {
+  const raw = String(value || "").trim();
+
+  // Convierte 2026-08-14 a 14/08/2026
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (match) {
+    const [, y, m, d] = match;
+    return `${d}/${m}/${y}`;
+  }
+
+  return raw;
+}
+
 
   function sortRecordsByDateDesc(rows) {
     return [...rows].sort((a, b) => {
