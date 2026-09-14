@@ -265,10 +265,27 @@
     });
   }
 
+  // Nueva función para convertir enlaces de Google Drive a imágenes directas
+  function convertirLinkDrive(url) {
+    if (typeof url !== "string" || !url) return "";
+    const urlLimpia = url.trim();
+    
+    // Extrae el ID del archivo de Google Drive
+    const driveRegex = /\/file\/d\/([a-zA-Z0-9_-]+)/;
+    const match = urlLimpia.match(driveRegex);
+    
+    if (match && match[1]) {
+      return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+    }
+    
+    return urlLimpia;
+  }
+
   function cargarFotoRobusta(user, onReady) {
+    // Usamos la nueva función para adaptar los links
     const fuentes = [
-      typeof user.fotoWeb === "string" ? user.fotoWeb.trim() : "",
-      typeof user.foto === "string" ? user.foto.trim() : ""
+      convertirLinkDrive(user.fotoWeb),
+      convertirLinkDrive(user.foto)
     ].filter(Boolean);
 
     let finalizado = false;
