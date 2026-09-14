@@ -59,7 +59,7 @@
     return date.toISOString().slice(0, 10);
   }
 
-  // Genera fecha local (Perú) para guardar en BD
+  // --- CORRECCIÓN: Genera fecha local en formato DD/MM/AAAA HH:MM:SS ---
   function formatLocalNowApi() {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -68,7 +68,25 @@
     const hh = String(now.getHours()).padStart(2, "0");
     const mi = String(now.getMinutes()).padStart(2, "0");
     const ss = String(now.getSeconds()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+    
+    // Retorna formato DD/MM/AAAA HH:MM:SS
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+  }
+
+  // Ayudante para que JavaScript ordene fechas DD/MM/AAAA sin fallar
+  function parseDateForSort(dateStr) {
+    const raw = String(dateStr || "").trim();
+    if (!raw) return 0;
+    // Si tiene formato AAAA-MM-DD
+    let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return new Date(raw).getTime();
+    // Si tiene formato DD/MM/AAAA
+    match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (match) {
+      const [, d, m, y, h = "0", mi = "0", s = "0"] = match;
+      return new Date(y, m - 1, d, h, mi, s).getTime();
+    }
+    return 0;
   }
 
   // Convierte "LOTE 11" a "lote_11" para que coincida con la columna en Supabase
@@ -243,27 +261,28 @@
             let query = db.from(item.table).select("*");
             if (payload.cliente) query = query.ilike("cliente", `%${payload.cliente}%`);
             if (payload.estado) query = query.ilike("estado", `%${payload.estado}%`);
+            
+            // Si hay filtro de fecha, usamos Like ya que ahora es texto DD/MM/YYYY
             if (payload.fecha) {
-              const fecha = String(payload.fecha).slice(0, 10);
-              const fechaSiguiente = getNextDate(fecha);
-              if (fechaSiguiente) query = query.gte("fecha_registro", fecha).lt("fecha_registro", fechaSiguiente);
+              const fechaBuscada = String(payload.fecha).trim();
+              query = query.ilike("fecha_registro", `${fechaBuscada}%`);
             }
+            
             const { data, error } = await query;
             if (error) { console.warn(`Error consultando ${item.table}:`, error.message); continue; }
             const formattedRows = (data || []).map((row) => formatLoteRecord(row, item.table, item.groupKey));
             rows = rows.concat(formattedRows);
           }
-          rows.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+          
+          // Usamos el parseador especial para ordenar por la fecha más reciente
+          rows.sort((a, b) => parseDateForSort(b.fecha) - parseDateForSort(a.fecha));
           return { ok: true, rows };
         }
-
-        // --- NUEVAS FUNCIONES PARA CREAR Y EDITAR REGISTROS ---
 
         case "createLoteRecord": {
           const { cliente, campos, comentario } = payload;
           if (!cliente) throw new Error("Debe seleccionar un cliente.");
 
-          // Saber en qué tabla va
           const { data: cData, error: cErr } = await db.from("maestros_clientes").select("grupo_key").eq("cliente", cliente).maybeSingle();
           if (cErr || !cData) throw new Error("Cliente no encontrado en maestros.");
           
@@ -286,11 +305,10 @@
             ultima_actualizacion: nowStr
           };
 
-          // Filtramos los campos dinámicos para no intentar insertar columnas que ya manejamos (fecha, usuario, etc.)
           if (campos) {
             Object.keys(campos).forEach(k => {
               const colName = formatColumnName(k);
-              if (['fecha', 'usuario', 'cliente', 'comentario', 'estado'].includes(colName)) return; // Ignorar
+              if (['fecha', 'usuario', 'cliente', 'comentario', 'estado'].includes(colName)) return; 
               insertData[colName] = campos[k];
             });
           }
@@ -340,11 +358,10 @@
           if (comentario !== undefined) updateData.comentario = comentario;
           if (estado !== undefined) updateData.estado = estado;
 
-          // Filtramos igual que en la creación
           if (campos) {
             Object.keys(campos).forEach(k => {
               const colName = formatColumnName(k);
-              if (['fecha', 'usuario', 'cliente', 'comentario', 'estado'].includes(colName)) return; // Ignorar
+              if (['fecha', 'usuario', 'cliente', 'comentario', 'estado'].includes(colName)) return; 
               updateData[colName] = campos[k];
             });
           }
@@ -361,10 +378,8 @@
         case "createChecklistRecord": {
           const { tipo, fechaChecklist, nExpo, pais, responsable, ubicacion, respuestas } = payload;
           
-          // Nombres exactos de tus tablas en Supabase
           const tableName = tipo === "INSUMOS" ? "CHECKLIST_INSUMOS" : "CHECKLIST_AREA";
 
-          // Generar ID Correlativo basado en tu columna id_checklist (ej: CHK-000010)
           const { data: lastRecord } = await db
             .from(tableName)
             .select("id_checklist")
@@ -381,15 +396,14 @@
           const newId = "CHK-" + String(nextNum).padStart(6, '0');
 
           const user = JSON.parse(localStorage.getItem("authUser") || "{}");
-          const nowStr = formatLocalNowApi();
+          const nowStr = formatLocalNowApi(); // <- Usa el nuevo formato de fecha DD/MM/AAAA
 
-          // Crear Objeto a guardar con los nombres EXACTOS de tus columnas comunes
           const insertData = {
             id_checklist: newId,
             fecha_registro: nowStr,
             tipo_checklist: tipo,
             fecha_checklist: fechaChecklist,
-            n_expo: parseInt(nExpo, 10) || null, // Convertido a número para int8
+            n_expo: parseInt(nExpo, 10) || null,
             pais: pais,
             responsable: responsable,
             usuario_login: user.email || user.usuario || "",
@@ -399,26 +413,20 @@
             ultima_actualizacion: nowStr
           };
 
-          // Si es área, agregamos la ubicación
           if (tipo === "AREA") {
             insertData.ubicacion = ubicacion;
           }
 
-          // Mapeo de respuestas adaptado a las columnas exactas de cada tabla
           if (respuestas) {
             Object.keys(respuestas).forEach(key => {
-              const colName = key.toLowerCase(); // ej: "stretch_film" o "pregunta_1"
+              const colName = key.toLowerCase();
               const ans = respuestas[key];
               
               if (tipo === "INSUMOS") {
-                // Insumos usa el sufijo "_estado"
                 insertData[`${colName}_estado`] = ans.estado || "";
               } else {
-                // Area usa el sufijo "_respuesta"
                 insertData[`${colName}_respuesta`] = ans.respuesta || "";
               }
-              
-              // Ambos usan "_comentario"
               insertData[`${colName}_comentario`] = ans.comentario ? ans.comentario : null; 
             });
           }
