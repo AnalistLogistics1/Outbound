@@ -1,3 +1,4 @@
+// js/toma-lotes.js
 document.addEventListener("DOMContentLoaded", async () => {
   requireAuth();
 
@@ -73,8 +74,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]);
   }
 
-  function apiPostTimed(action, payload, ms = 20000) {
-    return withTimeout(apiPost(action, payload), ms, action);
+  // CORRECCIÓN: Ahora verificamos si la API devolvió { ok: false }
+  async function apiPostTimed(action, payload, ms = 20000) {
+    const res = await withTimeout(apiPost(action, payload), ms, action);
+    if (res && res.ok === false) {
+      throw new Error(res.message || "Error al conectar con la base de datos.");
+    }
+    return res;
   }
 
   function parseJsonSafe(raw) {
@@ -104,20 +110,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (rolActivo) rolActivo.textContent = String(rol).toUpperCase();
   }
 
+  // CORRECCIÓN: Validamos sesión pero NO sobreescribimos la data local con el booleano 'true'
   async function loadSessionUser() {
     const storedUser = getStoredUserRobust();
     setUserUI(storedUser);
     try {
-      const res = await apiPostTimed("getSesion", { token }, 8000);
-      const userFromApi = res.user || res.session || null;
-      if (userFromApi) {
-        localStorage.setItem("authUser", JSON.stringify(userFromApi));
-        sessionStorage.setItem("authUser", JSON.stringify(userFromApi));
-        localStorage.setItem("ct_user", JSON.stringify(userFromApi));
-        setUserUI(userFromApi);
-      }
+      await apiPostTimed("getSesion", { token }, 8000);
     } catch (error) {
-      console.warn("No se pudo refrescar la sesión:", error);
+      console.warn("No se pudo validar la sesión en el servidor:", error);
     }
   }
 
@@ -222,6 +222,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.warn("No se pudo reproducir sonido:", error);
     }
   }
+
   async function openBarcodeScanner(inputElement) {
     if (!inputElement) {
       showToast("No se encontró el campo destino para escanear.", "error");
@@ -324,66 +325,63 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-function pickCodeInsideFrame(codes) {
-  const vw = scanVideo.videoWidth || 0;
-  const vh = scanVideo.videoHeight || 0;
+  function pickCodeInsideFrame(codes) {
+    const vw = scanVideo.videoWidth || 0;
+    const vh = scanVideo.videoHeight || 0;
 
-  if (!vw || !vh) {
-    return codes[0] || null;
-  }
-
-  // Zona central que coincide aprox. con el recuadro visual (88% ancho, 34% alto)
-  const zoneLeft = vw * 0.06;
-  const zoneRight = vw * 0.94;
-  const zoneTop = vh * 0.33;
-  const zoneBottom = vh * 0.67;
-
-  for (const code of codes) {
-    const box = code.boundingBox;
-    if (!box) continue;
-
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-
-    if (cx >= zoneLeft && cx <= zoneRight && cy >= zoneTop && cy <= zoneBottom) {
-      return code;
+    if (!vw || !vh) {
+      return codes[0] || null;
     }
-  }
 
-  return null;
-}
+    const zoneLeft = vw * 0.06;
+    const zoneRight = vw * 0.94;
+    const zoneTop = vh * 0.33;
+    const zoneBottom = vh * 0.67;
 
+    for (const code of codes) {
+      const box = code.boundingBox;
+      if (!box) continue;
 
-async function scanLoop() {
-  if (!scannerRunning || scanLocked || !barcodeDetector || !scanVideo) {
-    return;
-  }
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
 
-  try {
-    if (scanVideo.readyState >= 2) {
-      const codes = await barcodeDetector.detect(scanVideo);
-
-      if (codes && codes.length) {
-        const valid = pickCodeInsideFrame(codes);
-
-        if (valid) {
-          const value = String(valid.rawValue || "").trim();
-          if (value) {
-            onBarcodeDetected(value);
-            return;
-          }
-        } else {
-          setScannerMessage("Acerque el código al recuadro central.");
-        }
+      if (cx >= zoneLeft && cx <= zoneRight && cy >= zoneTop && cy <= zoneBottom) {
+        return code;
       }
     }
-  } catch (error) {
-    console.warn("Lectura en curso:", error);
+
+    return null;
   }
 
-  scanRafId = requestAnimationFrame(scanLoop);
-}
+  async function scanLoop() {
+    if (!scannerRunning || scanLocked || !barcodeDetector || !scanVideo) {
+      return;
+    }
 
+    try {
+      if (scanVideo.readyState >= 2) {
+        const codes = await barcodeDetector.detect(scanVideo);
+
+        if (codes && codes.length) {
+          const valid = pickCodeInsideFrame(codes);
+
+          if (valid) {
+            const value = String(valid.rawValue || "").trim();
+            if (value) {
+              onBarcodeDetected(value);
+              return;
+            }
+          } else {
+            setScannerMessage("Acerque el código al recuadro central.");
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Lectura en curso:", error);
+    }
+
+    scanRafId = requestAnimationFrame(scanLoop);
+  }
 
   function onBarcodeDetected(value) {
     if (scanLocked) return;
@@ -506,7 +504,6 @@ async function scanLoop() {
         cliente: filtroCliente ? filtroCliente.value : "",
         estado: filtroEstado ? filtroEstado.value : "",
         fecha: formatDateFilterForApi(filtroFecha ? filtroFecha.value : "")
-
       }, 20000);
 
       renderRecords(res.rows || []);
@@ -526,60 +523,54 @@ async function scanLoop() {
     }
   }
 
-function parseRecordDate(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return 0;
+  function parseRecordDate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return 0;
 
-  // Formato: 2026-08-14 11:52:35 o 2026-08-14 11:52
-  let match = raw.match(
-    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
+    let match = raw.match(
+      /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+    );
 
-  if (match) {
-    const [, y, m, d, h = "0", mi = "0", s = "0"] = match;
-    return new Date(
-      Number(y),
-      Number(m) - 1,
-      Number(d),
-      Number(h),
-      Number(mi),
-      Number(s)
-    ).getTime();
+    if (match) {
+      const [, y, m, d, h = "0", mi = "0", s = "0"] = match;
+      return new Date(
+        Number(y),
+        Number(m) - 1,
+        Number(d),
+        Number(h),
+        Number(mi),
+        Number(s)
+      ).getTime();
+    }
+
+    match = raw.match(
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+    );
+
+    if (match) {
+      const [, d, m, y, h = "0", mi = "0", s = "0"] = match;
+      return new Date(
+        Number(y),
+        Number(m) - 1,
+        Number(d),
+        Number(h),
+        Number(mi),
+        Number(s)
+      ).getTime();
+    }
+
+    return 0;
   }
 
-  // Formato: 14/08/2026 11:52:35 o 14/08/2026 11:52
-  match = raw.match(
-    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-  );
-
-  if (match) {
-    const [, d, m, y, h = "0", mi = "0", s = "0"] = match;
-    return new Date(
-      Number(y),
-      Number(m) - 1,
-      Number(d),
-      Number(h),
-      Number(mi),
-      Number(s)
-    ).getTime();
+  function formatDateFilterForApi(value) {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const [, y, m, d] = match;
+      return `${d}/${m}/${y}`;
+    }
+    return raw;
   }
-
-  return 0;
-}
-function formatDateFilterForApi(value) {
-  const raw = String(value || "").trim();
-
-  // Convierte 2026-08-14 a 14/08/2026
-  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-
-  if (match) {
-    const [, y, m, d] = match;
-    return `${d}/${m}/${y}`;
-  }
-
-  return raw;
-}
-
 
   function sortRecordsByDateDesc(rows) {
     return [...rows].sort((a, b) => {
@@ -589,45 +580,44 @@ function formatDateFilterForApi(value) {
     });
   }
 
-function renderRecords(rows) {
-  state.records = Array.isArray(rows) ? sortRecordsByDateDesc(rows) : [];
+  function renderRecords(rows) {
+    state.records = Array.isArray(rows) ? sortRecordsByDateDesc(rows) : [];
 
-  if (!tablaRegistros) return;
+    if (!tablaRegistros) return;
 
-  if (!state.records.length) {
-    tablaRegistros.innerHTML = `
-      <tr>
-        <td colspan="8" class="empty">No se encontraron registros.</td>
-      </tr>
-    `;
-    updateStats();
-    return;
-  }
-
-  tablaRegistros.innerHTML = state.records
-    .map((item) => {
-      return `
+    if (!state.records.length) {
+      tablaRegistros.innerHTML = `
         <tr>
-          <td><strong>${escapeHtml(item.id)}</strong></td>
-          <td>${escapeHtml(item.fecha)}</td>
-          <td>${escapeHtml(item.cliente)}</td>
-          <td>${escapeHtml(item.grupo || item.groupKey || "")}</td>
-          <td>${escapeHtml(item.nombre || item.usuario)}</td>
-          <td><span class="badge">${escapeHtml(item.estado)}</span></td>
-          <td>${escapeHtml(item.comentario || "")}</td>
-          <td>
-            <button type="button" class="edit-btn" data-id="${escapeHtml(item.id)}" title="Editar registro">
-              ✏️
-            </button>
-          </td>
+          <td colspan="8" class="empty">No se encontraron registros.</td>
         </tr>
       `;
-    })
-    .join("");
+      updateStats();
+      return;
+    }
 
-  updateStats();
-}
+    tablaRegistros.innerHTML = state.records
+      .map((item) => {
+        return `
+          <tr>
+            <td><strong>${escapeHtml(item.id)}</strong></td>
+            <td>${escapeHtml(item.fecha)}</td>
+            <td>${escapeHtml(item.cliente)}</td>
+            <td>${escapeHtml(item.grupo || item.groupKey || "")}</td>
+            <td>${escapeHtml(item.nombre || item.usuario)}</td>
+            <td><span class="badge">${escapeHtml(item.estado)}</span></td>
+            <td>${escapeHtml(item.comentario || "")}</td>
+            <td>
+              <button type="button" class="edit-btn" data-id="${escapeHtml(item.id)}" title="Editar registro">
+                ✏️
+              </button>
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
 
+    updateStats();
+  }
 
   function resetModalScroll() {
     if (!modalRegistro) return;
@@ -636,118 +626,113 @@ function renderRecords(rows) {
     if (modalBody) modalBody.scrollTop = 0;
   }
 
-function buildEditFields(campos) {
-  const entries = Object.entries(campos || {});
+  function buildEditFields(campos) {
+    const entries = Object.entries(campos || {});
 
-  if (!entries.length) {
-    return `<div class="hint">Este registro no tiene campos editables.</div>`;
+    if (!entries.length) {
+      return `<div class="hint">Este registro no tiene campos editables.</div>`;
+    }
+
+    return entries
+      .map(([campo, valor], index) => {
+        const campoNorm = normalize(campo);
+        const id = `edit_campo_${index}`;
+        const isFecha = campoNorm === "FECHA";
+        const isUsuario = campoNorm === "USUARIO";
+
+        return `
+          <div class="field">
+            <label for="${id}">${escapeHtml(campo)}</label>
+            <input
+              type="text"
+              id="${id}"
+              class="lote-field"
+              data-name="${escapeHtml(campo)}"
+              value="${escapeHtml(valor)}"
+              ${isFecha || isUsuario ? "readonly" : ""}
+            />
+          </div>
+        `;
+      })
+      .join("");
   }
 
-  return entries
-    .map(([campo, valor], index) => {
-      const campoNorm = normalize(campo);
-      const id = `edit_campo_${index}`;
-      const isFecha = campoNorm === "FECHA";
-      const isUsuario = campoNorm === "USUARIO";
+  async function openEditModal(id) {
+    if (!id) return;
 
-      return `
-        <div class="field">
-          <label for="${id}">${escapeHtml(campo)}</label>
-          <input
-            type="text"
-            id="${id}"
-            class="lote-field"
-            data-name="${escapeHtml(campo)}"
-            value="${escapeHtml(valor)}"
-            ${isFecha || isUsuario ? "readonly" : ""}
-          />
-        </div>
-      `;
-    })
-    .join("");
-}
+    try {
+      showPageLoader("Cargando registro...");
+      const rec = await apiPostTimed("getLoteRecord", { token, id }, 15000);
+      hidePageLoader();
 
-async function openEditModal(id) {
-  if (!id) return;
+      editingId = rec.id;
+      formRegistro.reset();
 
-  try {
-    showPageLoader("Cargando registro...");
-    const rec = await apiPostTimed("getLoteRecord", { token, id }, 15000);
-    hidePageLoader();
+      fillSelect(clienteRegistro, [rec.cliente], rec.cliente);
+      clienteRegistro.value = rec.cliente;
+      clienteRegistro.disabled = true;
 
-    editingId = rec.id;
+      camposDinamicos.innerHTML = buildEditFields(rec.campos || rec.datos || {});
+      if (comentarioRegistro) comentarioRegistro.value = rec.comentario || "";
+
+      const title = modalRegistro.querySelector(".modal-head h2");
+      if (title) title.textContent = `Editar ${rec.id}`;
+
+      if (btnGuardarRegistro) btnGuardarRegistro.textContent = "Guardar cambios";
+
+      document.body.classList.add("modal-open");
+      modalRegistro.classList.add("is-open");
+      modalRegistro.setAttribute("aria-hidden", "false");
+      setTimeout(resetModalScroll, 50);
+    } catch (error) {
+      hidePageLoader();
+      console.error("Error abriendo edición:", error);
+      showToast(error.message || "No se pudo cargar el registro.", "error");
+    }
+  }
+
+  function openModal() {
+    if (!formRegistro || !camposDinamicos || !modalRegistro) return;
+
+    editingId = null;
+
+    if (clienteRegistro) {
+      clienteRegistro.disabled = false;
+      fillSelect(clienteRegistro, state.meta.clientes, "Seleccione cliente");
+    }
 
     formRegistro.reset();
 
-    // Cliente fijo (no editable)
-    fillSelect(clienteRegistro, [rec.cliente], rec.cliente);
-    clienteRegistro.value = rec.cliente;
-    clienteRegistro.disabled = true;
-
-    camposDinamicos.innerHTML = buildEditFields(rec.campos || rec.datos || {});
-    if (comentarioRegistro) comentarioRegistro.value = rec.comentario || "";
-
     const title = modalRegistro.querySelector(".modal-head h2");
-    if (title) title.textContent = `Editar ${rec.id}`;
+    if (title) title.textContent = "Toma de Lotes";
+    if (btnGuardarRegistro) btnGuardarRegistro.textContent = "Guardar Registro";
 
-    if (btnGuardarRegistro) btnGuardarRegistro.textContent = "Guardar cambios";
+    camposDinamicos.innerHTML = `
+      <div class="hint">
+        Seleccione un cliente para cargar los campos correspondientes.
+      </div>
+    `;
 
     document.body.classList.add("modal-open");
     modalRegistro.classList.add("is-open");
     modalRegistro.setAttribute("aria-hidden", "false");
+
     setTimeout(resetModalScroll, 50);
-  } catch (error) {
-    hidePageLoader();
-    console.error("Error abriendo edición:", error);
-    showToast(error.message || "No se pudo cargar el registro.", "error");
-  }
-}
-
-
-function openModal() {
-  if (!formRegistro || !camposDinamicos || !modalRegistro) return;
-
-  editingId = null;
-
-  if (clienteRegistro) {
-    clienteRegistro.disabled = false;
-    fillSelect(clienteRegistro, state.meta.clientes, "Seleccione cliente");
   }
 
-  formRegistro.reset();
+  function closeModal() {
+    if (!modalRegistro) return;
 
-  const title = modalRegistro.querySelector(".modal-head h2");
-  if (title) title.textContent = "Toma de Lotes";
-  if (btnGuardarRegistro) btnGuardarRegistro.textContent = "Guardar Registro";
+    modalRegistro.classList.remove("is-open");
+    modalRegistro.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
 
-  camposDinamicos.innerHTML = `
-    <div class="hint">
-      Seleccione un cliente para cargar los campos correspondientes.
-    </div>
-  `;
+    editingId = null;
 
-  document.body.classList.add("modal-open");
-  modalRegistro.classList.add("is-open");
-  modalRegistro.setAttribute("aria-hidden", "false");
-
-  setTimeout(resetModalScroll, 50);
-}
-
-
-function closeModal() {
-  if (!modalRegistro) return;
-
-  modalRegistro.classList.remove("is-open");
-  modalRegistro.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("modal-open");
-
-  editingId = null;
-
-  if (clienteRegistro) {
-    clienteRegistro.disabled = false;
+    if (clienteRegistro) {
+      clienteRegistro.disabled = false;
+    }
   }
-}
-
 
   function renderDynamicFields(cliente) {
     if (!camposDinamicos) return;
@@ -855,69 +840,66 @@ function closeModal() {
     return campos;
   }
 
-async function saveRecord(event) {
-  event.preventDefault();
+  async function saveRecord(event) {
+    event.preventDefault();
 
-  // MODO EDICIÓN
-  if (editingId) {
+    if (editingId) {
+      const campos = collectFields();
+
+      try {
+        setButtonLoading(btnGuardarRegistro, "Guardando...", true);
+
+        await apiPostTimed("updateLoteRecord", {
+          token,
+          id: editingId,
+          campos,
+          comentario: comentarioRegistro ? comentarioRegistro.value.trim() : ""
+        }, 20000);
+
+        showToast(`Registro ${editingId} actualizado correctamente.`, "ok");
+
+        closeModal();
+        await loadRecords("Actualizando registros...");
+      } catch (error) {
+        console.error("Error actualizando registro:", error);
+        showToast(error.message || "No se pudo actualizar el registro.", "error");
+      } finally {
+        setButtonLoading(btnGuardarRegistro, "Guardar cambios", false);
+      }
+
+      return;
+    }
+
+    const cliente = clienteRegistro ? clienteRegistro.value : "";
+
+    if (!cliente) {
+      showToast("Seleccione un cliente.", "error");
+      return;
+    }
+
     const campos = collectFields();
 
     try {
       setButtonLoading(btnGuardarRegistro, "Guardando...", true);
 
-      await apiPostTimed("updateLoteRecord", {
+      const res = await apiPostTimed("createLoteRecord", {
         token,
-        id: editingId,
+        cliente,
         campos,
         comentario: comentarioRegistro ? comentarioRegistro.value.trim() : ""
       }, 20000);
 
-      showToast(`Registro ${editingId} actualizado correctamente.`, "ok");
+      showToast(`Registro ${res.id} guardado correctamente en ${res.sheetName}.`, "ok");
 
       closeModal();
       await loadRecords("Actualizando registros...");
     } catch (error) {
-      console.error("Error actualizando registro:", error);
-      showToast(error.message || "No se pudo actualizar el registro.", "error");
+      console.error("Error guardando registro:", error);
+      showToast(error.message || "No se pudo guardar el registro.", "error");
     } finally {
-      setButtonLoading(btnGuardarRegistro, "Guardar cambios", false);
+      setButtonLoading(btnGuardarRegistro, "Guardar Registro", false);
     }
-
-    return;
   }
-
-  // MODO NUEVO
-  const cliente = clienteRegistro ? clienteRegistro.value : "";
-
-  if (!cliente) {
-    showToast("Seleccione un cliente.", "error");
-    return;
-  }
-
-  const campos = collectFields();
-
-  try {
-    setButtonLoading(btnGuardarRegistro, "Guardando...", true);
-
-    const res = await apiPostTimed("createLoteRecord", {
-      token,
-      cliente,
-      campos,
-      comentario: comentarioRegistro ? comentarioRegistro.value.trim() : ""
-    }, 20000);
-
-    showToast(`Registro ${res.id} guardado correctamente en ${res.sheetName}.`, "ok");
-
-    closeModal();
-    await loadRecords("Actualizando registros...");
-  } catch (error) {
-    console.error("Error guardando registro:", error);
-    showToast(error.message || "No se pudo guardar el registro.", "error");
-  } finally {
-    setButtonLoading(btnGuardarRegistro, "Guardar Registro", false);
-  }
-}
-
 
   function safeSheetName(name) {
     return String(name || "Hoja")
@@ -944,7 +926,7 @@ async function saveRecord(event) {
 
   function buildNormalizedDatosMap(datos) {
     const map = {};
-    Object.keys(datos || {}).forEach((key) => {
+    Object.即可(datos || {}).forEach((key) => {
       map[normalizeExportKey(key)] = datos[key];
     });
     return map;
@@ -972,23 +954,21 @@ async function saveRecord(event) {
     ];
   }
 
-function applyWorksheetWidths(ws, headers) {
-  ws["!cols"] = headers.map((header) => {
-    const width = Math.max(12, String(header).length + 2);
-    return { wch: Math.min(width, 30) };
-  });
-}
+  function applyWorksheetWidths(ws, headers) {
+    ws["!cols"] = headers.map((header) => {
+      const width = Math.max(12, String(header).length + 2);
+      return { wch: Math.min(width, 30) };
+    });
+  }
 
-
-function applyAutoFilter(ws, headers, rowCount) {
-  if (!headers.length) return;
-  const lastColLetter = XLSX.utils.encode_col(headers.length - 1);
-  const lastRowNumber = Math.max(1, rowCount);
-  ws["!autofilter"] = {
-    ref: `A1:${lastColLetter}${lastRowNumber}`
-  };
-}
-
+  function applyAutoFilter(ws, headers, rowCount) {
+    if (!headers.length) return;
+    const lastColLetter = XLSX.utils.encode_col(headers.length - 1);
+    const lastRowNumber = Math.max(1, rowCount);
+    ws["!autofilter"] = {
+      ref: `A1:${lastColLetter}${lastRowNumber}`
+    };
+  }
 
   function downloadExcelWorkbook() {
     if (typeof XLSX === "undefined") {
@@ -1067,15 +1047,14 @@ function applyAutoFilter(ws, headers, rowCount) {
         event.preventDefault();
       }
     });
-document.addEventListener("click", (event) => {
-  const editButton = event.target.closest(".edit-btn");
-  if (!editButton) return;
-
-  const id = editButton.dataset.id;
-  openEditModal(id);
-});
-
   }
+
+  document.addEventListener("click", (event) => {
+    const editButton = event.target.closest(".edit-btn");
+    if (!editButton) return;
+    const id = editButton.dataset.id;
+    openEditModal(id);
+  });
 
   if (clienteRegistro) {
     clienteRegistro.addEventListener("change", () => {
@@ -1134,7 +1113,7 @@ document.addEventListener("click", (event) => {
       tablaRegistros.innerHTML = `
         <tr>
           <td colspan="8" class="empty">
-            No se pudo cargar la información inicial.
+            No se pudo cargar la información inicial o no hay datos en la base de datos.
           </td>
         </tr>
       `;
@@ -1143,4 +1122,3 @@ document.addEventListener("click", (event) => {
     hidePageLoader();
   }
 });
-
