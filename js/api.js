@@ -3,7 +3,7 @@
   "use strict";
 
   const SUPABASE_URL = "https://onlvwhmbytgrkqqfqpib.supabase.co";
-  const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY_AQUI";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubHZ3aG1ieXRncmtxcWZxcGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxNDg2MTIsImV4cCI6MjEwNDcyNDYxMn0.xycA65ZNrqGHHjiS4fLuDM89N6bj3Qi2B7wh-Y-xsh4";
 
   let supabaseApp = null;
 
