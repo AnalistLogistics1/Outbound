@@ -128,14 +128,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (fechaChecklist) fechaChecklist.value = formatNow();
   }
 
-  // AQUÍ ESTÁ LA CORRECCIÓN PRINCIPAL PARA ATRAPAR ERRORES DE SUPABASE
   async function callApi(action, payload = {}) {
     if (!token) throw new Error("No se encontró token de sesión.");
     if (typeof window.apiPost !== "function") throw new Error("No se encontró apiPost. Revise js/api.js.");
 
     const res = await window.apiPost(action, { token, ...payload });
     
-    // Validamos explícitamente si Supabase devolvió un error
     if (res && res.ok === false) {
       throw new Error(res.message || "Error al conectar con la base de datos.");
     }
@@ -352,14 +350,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     try {
       const data = await callApi("getChecklistMeta");
-      mergeMetaFromApi(data);
-      fillSelect(pais, meta.paises, "Seleccione país");
-      fillSelect(responsable, meta.responsables, "Seleccione responsable");
-      fillSelect(ubicacion, meta.ubicaciones, "Seleccione ubicación");
-      renderQuestions();
+      if (data && data.paises) {
+        mergeMetaFromApi(data);
+        fillSelect(pais, meta.paises, "Seleccione país");
+        fillSelect(responsable, meta.responsables, "Seleccione responsable");
+        fillSelect(ubicacion, meta.ubicaciones, "Seleccione ubicación");
+        renderQuestions();
+      }
       setMessage("");
     } catch (error) {
-      console.warn("Se usan valores locales de checklist debido a:", error.message);
+      console.warn("Usando metadata local para Checklist.");
     }
   }
 
