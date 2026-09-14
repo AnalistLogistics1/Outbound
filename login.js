@@ -1,205 +1,317 @@
-// js/api.js
+// login.js
+(function () {
+  "use strict";
 
-const SUPABASE_URL = "https://onlvwhmbytgrkqqfqpib.supabase.co"; 
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubHZ3aG1ieXRncmtxcWZxcGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxNDg2MTIsImV4cCI6MjEwNDcyNDYxMn0.xycA65ZNrqGHHjiS4fLuDM89N6bj3Qi2B7wh-Y-xsh4";
+  const el = {};
+  let currentUser = null;
+  let validateTimer = null;
+  let validationSequence = 0;
 
-// Inicializamos usando supabaseClient para evitar choques de nombres
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  document.addEventListener("DOMContentLoaded", initLogin);
 
-function validateApiUrl_() {
-  if (!SUPABASE_URL) {
-    throw new Error("Configure las credenciales de Supabase en js/api.js");
-  }
-}
+  function initLogin() {
+    el.form = document.getElementById("loginForm");
+    el.usuario = document.getElementById("usuario");
+    el.password = document.getElementById("password");
+    el.seccionPassword = document.getElementById("seccionPassword");
 
-async function apiPost(action, payload = {}) {
-  validateApiUrl_();
-  
-  try {
-    switch (action) {
-      
-      // ==========================================
-      // 1. MÓDULO DE LOGIN
-      // ==========================================
-      case 'validarUsuario':
-      case 'login': {
-        const usuarioInput = payload.usuario || payload.username;
-        const claveInput = payload.password;
+    el.estadoValidacion = document.getElementById("estadoValidacion");
+    el.textoValidacion = document.getElementById("textoValidacion");
 
-        // Consultamos a la tabla 'planilla' (asegúrate de que esté en minúsculas en Supabase)
-        const { data: userRow, error } = await supabaseClient
-          .from('planilla')
-          .select('*')
-          .ilike('usuario', usuarioInput) // ilike no distingue entre mayúsculas y minúsculas
-          .single();
+    el.vistaUsuario = document.getElementById("vistaUsuario");
+    el.fotoUsuario = document.getElementById("fotoUsuario");
+    el.nombreUsuario = document.getElementById("nombreUsuario");
+    el.rolUsuario = document.getElementById("rolUsuario");
 
-        if (error || !userRow) {
-          throw new Error('Usuario no encontrado.');
-        }
+    el.customAlert = document.getElementById("customAlert");
+    el.customAlertTitle = document.getElementById("customAlertTitle");
+    el.customAlertMessage = document.getElementById("customAlertMessage");
+    el.customAlertBtn = document.getElementById("customAlertBtn");
 
-        if (action === 'login' && String(userRow.password) !== String(claveInput)) {
-          throw new Error('Contraseña incorrecta.');
-        }
-
-        const user = {
-          usuario: userRow.usuario, 
-          username: userRow.usuario,
-          nombre: userRow.nombre,
-          rol: userRow.rol || userRow.cargo || 'USUARIO',
-          cargo: userRow.cargo || userRow.rol || 'USUARIO',
-          area: userRow.area || '',
-          foto: userRow.foto || '', 
-          fotoWeb: userRow.foto || ''
-        };
-
-        if (action === 'validarUsuario') {
-          return { found: true, user: user };
-        }
-
-        const token = 'token_' + Date.now();
-        return {
-          token: token, 
-          user: user,
-          session: { token: token, ...user, loginAt: new Date().toISOString() }
-        };
-      }
-
-      case 'getSesion': {
-        const token = payload.token;
-        if (!token) throw new Error('Sesión inválida');
-        return { session: true }; 
-      }
-
-      case 'logout': {
-        return { closed: true };
-      }
-
-
-      // ==========================================
-      // 2. MÓDULO TOMA DE LOTES
-      // ==========================================
-      case 'getLotesMeta': {
-        const { data: clientesData, error: errC } = await supabaseClient.from('maestros_clientes').select('*');
-        const { data: camposData, error: errF } = await supabaseClient.from('maestros_campos').select('*');
-        
-        if (errC || errF) throw new Error('Error cargando maestros de lotes.');
-
-        let clientesUnicos = new Set();
-        let config = {};
-        let groups = {};
-
-        ["PRIORIZADOS_1", "PRIORIZADOS_2", "PRIORIZADOS_3"].forEach(key => {
-            groups[key] = { key: key, label: key.replace("_", " "), sheetName: `lotes_${key.toLowerCase()}`, clientes: [], campos: [], storageFields: [] };
-        });
-
-        clientesData.forEach(row => {
-            const cliente = row.cliente;
-            const grupo = row.grupo_key;
-            clientesUnicos.add(cliente);
-            if(groups[grupo]) {
-                if(!groups[grupo].clientes.includes(cliente)) groups[grupo].clientes.push(cliente);
-            }
-            config[cliente] = { cliente: cliente, groupKey: grupo, sheetName: `lotes_${grupo.toLowerCase()}`, campos: [], storageFields: [] };
-        });
-
-        camposData.forEach(row => {
-            const grupo = row.grupo_key;
-            const campo = row.campo;
-            if (groups[grupo]) {
-                if(!groups[grupo].campos.includes(campo)) groups[grupo].campos.push(campo);
-                if(!groups[grupo].storageFields.includes(campo)) groups[grupo].storageFields.push(campo);
-            }
-        });
-
-        Object.keys(config).forEach(c => {
-            let g = config[c].groupKey;
-            config[c].campos = groups[g].campos;
-            config[c].storageFields = groups[g].storageFields;
-        });
-
-        return {
-            clientes: Array.from(clientesUnicos).sort(),
-            config: config,
-            groups: groups,
-            serverNow: new Date().toISOString()
-        };
-      }
-
-      case 'listLoteRecords': {
-        const tablas = ['lotes_priorizados_1', 'lotes_priorizados_2', 'lotes_priorizados_3'];
-        let todosLosRegistros = [];
-
-        for (const tabla of tablas) {
-            let query = supabaseClient.from(tabla).select('*');
-            if (payload.cliente) query = query.ilike('cliente', `%${payload.cliente}%`);
-            if (payload.estado) query = query.ilike('estado', `%${payload.estado}%`);
-            if (payload.fecha) query = query.ilike('fecha_registro', `${payload.fecha}%`);
-
-            const { data, error } = await query;
-            if (!error && data) {
-                const registrosFormateados = data.map(r => {
-                    let datosExtra = {};
-                    Object.keys(r).forEach(k => {
-                        if (!['id_registro', 'fecha_registro', 'cliente', 'usuario_login', 'nombre_usuario', 'rol_usuario', 'estado', 'comentario', 'ultima_actualizacion'].includes(k)) {
-                            datosExtra[k] = r[k] || "";
-                        }
-                    });
-
-                    return {
-                        id: r.id_registro,
-                        fecha: r.fecha_registro,
-                        cliente: r.cliente,
-                        grupo: tabla.toUpperCase(),
-                        groupKey: tabla.toUpperCase().replace("LOTES_", ""),
-                        sheetName: tabla,
-                        usuario: r.usuario_login,
-                        nombre: r.nombre_usuario,
-                        rol: r.rol_usuario,
-                        estado: r.estado,
-                        comentario: r.comentario,
-                        actualizado: r.ultima_actualizacion,
-                        datos: datosExtra,
-                        campos: datosExtra
-                    };
-                });
-                todosLosRegistros = todosLosRegistros.concat(registrosFormateados);
-            }
-        }
-        return { rows: todosLosRegistros };
-      }
-
-
-      // ==========================================
-      // 3. MÓDULO DE CHECKLISTS
-      // ==========================================
-      case 'getChecklistMeta': {
-        throw new Error("Usar metadata local"); 
-      }
-
-      case 'exportChecklistData': {
-        const { data: insumos } = await supabaseClient.from('checklist_insumos').select('*');
-        const { data: areas } = await supabaseClient.from('checklist_area').select('*');
-
-        const objToArray = (dataArray) => {
-            if (!dataArray || dataArray.length === 0) return [];
-            const headers = Object.keys(dataArray[0]);
-            return [headers, ...dataArray.map(row => headers.map(h => row[h] || ""))];
-        };
-
-        return {
-            insumos: objToArray(insumos),
-            area: objToArray(areas)
-        };
-      }
-
-      default:
-        throw new Error('Acción no implementada todavía: ' + action);
+    if (!el.form || !el.usuario || !el.password) {
+      console.error("No se encontraron los elementos principales del login.");
+      return;
     }
-  } catch (err) {
-    throw new Error(err.message || 'Error interno de la base de datos.');
-  }
-}
 
-async function apiGet(params = {}) {
-  throw new Error("apiGet ya no se usa con Supabase.");
-}
+    if (typeof window.apiPost !== "function") {
+      showAlert("Error de configuración", "No se cargó correctamente js/api.js.");
+      return;
+    }
+
+    if (typeof window.getToken === "function" && window.getToken()) {
+      window.location.replace(getSafeMenuUrl());
+      return;
+    }
+
+    resetLoginView();
+
+    el.usuario.addEventListener("input", handleUsuarioInput);
+    el.usuario.addEventListener("blur", function () {
+      validateUser(false);
+    });
+
+    el.usuario.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && isHidden(el.seccionPassword)) {
+        event.preventDefault();
+        validateUser(true);
+      }
+    });
+
+    el.form.addEventListener("submit", handleLoginSubmit);
+
+    if (el.customAlertBtn) {
+      el.customAlertBtn.addEventListener("click", hideAlert);
+    }
+
+    if (el.customAlert) {
+      el.customAlert.addEventListener("click", function (event) {
+        if (event.target === el.customAlert) {
+          hideAlert();
+        }
+      });
+    }
+  }
+
+  function getSafeMenuUrl() {
+    if (typeof window.getMenuUrl === "function") {
+      return window.getMenuUrl();
+    }
+
+    return "./Menu-Opciones/menu.html";
+  }
+
+  function show(element) {
+    if (element) {
+      element.classList.remove("oculto");
+    }
+  }
+
+  function hide(element) {
+    if (element) {
+      element.classList.add("oculto");
+    }
+  }
+
+  function isHidden(element) {
+    return !element || element.classList.contains("oculto");
+  }
+
+  function showValidation(message) {
+    if (el.textoValidacion) {
+      el.textoValidacion.textContent = message;
+    }
+
+    show(el.estadoValidacion);
+  }
+
+  function hideValidation() {
+    hide(el.estadoValidacion);
+  }
+
+  function resetLoginView() {
+    currentUser = null;
+
+    hideValidation();
+    hide(el.vistaUsuario);
+    hide(el.seccionPassword);
+
+    if (el.password) {
+      el.password.value = "";
+    }
+
+    if (el.fotoUsuario) {
+      el.fotoUsuario.removeAttribute("src");
+      el.fotoUsuario.style.display = "none";
+    }
+
+    if (el.nombreUsuario) {
+      el.nombreUsuario.textContent = "Usuario detectado";
+    }
+
+    if (el.rolUsuario) {
+      el.rolUsuario.textContent = "";
+    }
+  }
+
+  function handleUsuarioInput() {
+    clearTimeout(validateTimer);
+
+    currentUser = null;
+    hide(el.vistaUsuario);
+    hide(el.seccionPassword);
+
+    if (el.password) {
+      el.password.value = "";
+    }
+
+    const usuario = el.usuario.value.trim();
+
+    if (usuario.length < 2) {
+      hideValidation();
+      return;
+    }
+
+    showValidation("Validando usuario...");
+
+    validateTimer = setTimeout(function () {
+      validateUser(false);
+    }, 500);
+  }
+
+  async function validateUser(showErrors) {
+    clearTimeout(validateTimer);
+
+    const usuario = el.usuario.value.trim();
+
+    if (!usuario) {
+      resetLoginView();
+      return null;
+    }
+
+    const sequence = ++validationSequence;
+
+    try {
+      showValidation("Validando usuario...");
+
+      const response = await window.apiPost("validarUsuario", {
+        usuario
+      });
+
+      if (sequence !== validationSequence) {
+        return null;
+      }
+
+      if (!response || !response.user) {
+        throw new Error("Usuario no encontrado.");
+      }
+
+      currentUser = response.user;
+      renderUser(currentUser);
+
+      hideValidation();
+      show(el.vistaUsuario);
+      show(el.seccionPassword);
+
+      setTimeout(function () {
+        el.password.focus();
+      }, 50);
+
+      return currentUser;
+    } catch (error) {
+      if (sequence !== validationSequence) {
+        return null;
+      }
+
+      currentUser = null;
+      hide(el.vistaUsuario);
+      hide(el.seccionPassword);
+      showValidation("Usuario no encontrado.");
+
+      if (showErrors) {
+        showAlert("Usuario no encontrado", error.message || "Verifique el usuario ingresado.");
+      }
+
+      return null;
+    }
+  }
+
+  function renderUser(user) {
+    if (el.nombreUsuario) {
+      el.nombreUsuario.textContent = user.nombre || user.usuario || "Usuario";
+    }
+
+    if (el.rolUsuario) {
+      el.rolUsuario.textContent = user.cargo || user.rol || "USUARIO";
+    }
+
+    if (el.fotoUsuario) {
+      const foto = user.fotoWeb || user.foto || "";
+
+      if (foto) {
+        el.fotoUsuario.src = foto;
+        el.fotoUsuario.style.display = "";
+      } else {
+        el.fotoUsuario.removeAttribute("src");
+        el.fotoUsuario.style.display = "none";
+      }
+    }
+  }
+
+  async function handleLoginSubmit(event) {
+    event.preventDefault();
+
+    const usuario = el.usuario.value.trim();
+    const password = el.password.value;
+
+    if (!usuario) {
+      showAlert("Usuario requerido", "Ingrese su usuario.");
+      el.usuario.focus();
+      return;
+    }
+
+    if (!currentUser || currentUser.usuario?.toLowerCase() !== usuario.toLowerCase()) {
+      const validatedUser = await validateUser(true);
+
+      if (!validatedUser) {
+        return;
+      }
+    }
+
+    if (!password) {
+      showAlert("Contraseña requerida", "Ingrese su contraseña.");
+      el.password.focus();
+      return;
+    }
+
+    const submitButton = el.form.querySelector('button[type="submit"]');
+
+    try {
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Ingresando...";
+      }
+
+      const response = await window.apiPost("login", {
+        usuario,
+        username: usuario,
+        password
+      });
+
+      if (typeof window.saveSession !== "function") {
+        throw new Error("No se cargó correctamente js/auth.js.");
+      }
+
+      window.saveSession(response);
+      window.location.replace(getSafeMenuUrl());
+    } catch (error) {
+      showAlert("No se pudo iniciar sesión", error.message || "Verifique sus datos.");
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = "Ingresar";
+      }
+    }
+  }
+
+  function showAlert(title, message) {
+    if (!el.customAlert) {
+      window.alert(`${title}
+${message}`);
+      return;
+    }
+
+    if (el.customAlertTitle) {
+      el.customAlertTitle.textContent = title || "Aviso";
+    }
+
+    if (el.customAlertMessage) {
+      el.customAlertMessage.textContent = message || "";
+    }
+
+    show(el.customAlert);
+  }
+
+  function hideAlert() {
+    hide(el.customAlert);
+  }
+})();
