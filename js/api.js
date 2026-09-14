@@ -7,10 +7,10 @@
 
   let supabaseApp = null;
 
-  const LOTES_TABLES = [
-    { table: "lotes_priorizados_1", groupKey: "PRIORIZADOS_1" },
-    { table: "lotes_priorizados_2", groupKey: "PRIORIZADOS_2" },
-    { table: "lotes_priorizados_3", groupKey: "PRIORIZADOS_3" }
+const LOTES_TABLES = [
+    { table: "LOTES_PRIORIZADOS_1", groupKey: "PRIORIZADOS_1" },
+    { table: "LOTES_PRIORIZADOS_2", groupKey: "PRIORIZADOS_2" },
+    { table: "LOTES_PRIORIZADOS_3", groupKey: "PRIORIZADOS_3" }
   ];
 
   const BASE_LOTE_FIELDS = new Set([
