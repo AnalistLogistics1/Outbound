@@ -1,7 +1,10 @@
+// menu.js
 document.addEventListener("DOMContentLoaded", () => {
-  requireAuth();
+  // Asegurarnos de que el usuario esté logueado
+  if (typeof window.requireAuth === "function") window.requireAuth();
 
-  const user = getUser();
+  // Obtener usuario (de auth.js)
+  const user = typeof window.getUser === "function" ? window.getUser() : null;
 
   const heroLeft = document.getElementById("heroLeft");
   const heroRight = document.getElementById("heroRight");
@@ -38,81 +41,69 @@ document.addEventListener("DOMContentLoaded", () => {
         <text x="60" y="320" fill="rgba(255,255,255,0.92)" font-family="Segoe UI, Arial" font-size="34">${subtitle}</text>
       </svg>
     `;
-
     return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
-const apps = [
-  {
-    title: "Toma de Lotes",
-    desc: "Registro y seguimiento logístico de lotes por cliente.",
-    pill: "Módulo activo",
-    accent: "accent-blue",
-    image: resolveAsset("../img/toma-lotes.jpg"),
-    fallback: createThumb("TL", "#0f4c81", "#38bdf8", "Toma de lotes"),
-    icon: "TL",
-    url: "../toma-lotes.html"
-  },
-  {
-    title: "Check List",
-    desc: "Registro de check list de insumos y área para alistamiento de exportación.",
-    pill: "Módulo activo",
-    accent: "accent-blue",
-    image: resolveAsset("../img/check-list.jpg"),
-    fallback: createThumb("CL", "#072B5C", "#f8b400", "Check List"),
-    icon: "CL",
-    url: "../check-list.html"
+  const apps = [
+    {
+      title: "Toma de Lotes",
+      desc: "Registro y seguimiento logístico de lotes por cliente.",
+      pill: "Módulo activo",
+      accent: "accent-blue",
+      image: resolveAsset("../img/toma-lotes.jpg"),
+      fallback: createThumb("TL", "#0f4c81", "#38bdf8", "Toma de lotes"),
+      icon: "TL",
+      url: "../toma-lotes.html"
+    },
+    {
+      title: "Check List",
+      desc: "Registro de check list de insumos y área para alistamiento de exportación.",
+      pill: "Módulo activo",
+      accent: "accent-blue",
+      image: resolveAsset("../img/check-list.jpg"),
+      fallback: createThumb("CL", "#072B5C", "#f8b400", "Check List"),
+      icon: "CL",
+      url: "../check-list.html"
+    }
+  ];
+
+  // AQUI CORREGIMOS EL SALUDO Y EL CARGO EN LA INTERFAZ
+  if (mensajeBienvenida) {
+    mensajeBienvenida.textContent = `Hola, ${user?.nombre || "Usuario"}.`;
   }
-];
-
-
-  mensajeBienvenida.textContent = `Hola, ${user?.nombre || user?.username || user?.usuario || "Usuario"}.`;
-  mensajeDescripcion.textContent = "Seleccione el módulo que desea utilizar hoy.";
-  heroPerfil.textContent = (user?.rol || user?.cargo || "USUARIO").toUpperCase();
-  heroTotalApps.textContent = `${apps.length} módulo${apps.length === 1 ? "" : "s"}`;
+  if (heroPerfil) {
+    // Leemos 'cargo' primero. Si no existe, usamos 'rol'
+    heroPerfil.textContent = (user?.cargo || user?.rol || "USUARIO").toUpperCase();
+  }
+  if (mensajeDescripcion) mensajeDescripcion.textContent = "Seleccione el módulo que desea utilizar hoy.";
+  if (heroTotalApps) heroTotalApps.textContent = `${apps.length} módulo${apps.length === 1 ? "" : "s"}`;
 
   function renderApps() {
+    if (!appsGrid) return;
     appsGrid.innerHTML = "";
-
     apps.forEach((app) => {
       const card = document.createElement("article");
       card.className = `app-card ${app.accent}${app.url === "#" ? " is-disabled" : ""}`;
-
       card.innerHTML = `
         <div class="app-media">
           <img src="${app.image}" alt="${app.title}">
           <div class="app-media-overlay"></div>
         </div>
-
         <div class="app-card-body">
           <span class="app-pill">${app.pill}</span>
           <h3>${app.title}</h3>
           <p>${app.desc}</p>
-
           <div class="app-card-bottom">
             <span>${app.url === "#" ? "Disponible pronto" : "Ingresar"}</span>
             <span>→</span>
           </div>
         </div>
       `;
-
       const img = card.querySelector("img");
-
-      img.addEventListener("load", () => {
-        console.log("Imagen cargada:", app.image);
-      });
-
-      img.addEventListener("error", () => {
-        console.warn("No se pudo cargar la imagen, se usará fallback:", app.image);
-        img.src = app.fallback;
-      });
-
+      img.addEventListener("error", () => { img.src = app.fallback; });
       if (app.url !== "#") {
-        card.addEventListener("click", () => {
-          window.location.href = app.url;
-        });
+        card.addEventListener("click", () => { window.location.href = app.url; });
       }
-
       appsGrid.appendChild(card);
     });
   }
@@ -137,41 +128,19 @@ const apps = [
       saludo = "Buenas tardes";
     }
 
-    heroLeft.className = `hero-left ${theme}`;
-    heroRight.className = `hero-right ${theme}`;
-    heroScene.textContent = icon;
-    heroSceneMini.textContent = icon;
-    heroShift.textContent = saludo;
-    heroSaludo.textContent = `${saludo}, bienvenido al sistema`;
+    if (heroLeft) heroLeft.className = `hero-left ${theme}`;
+    if (heroRight) heroRight.className = `hero-right ${theme}`;
+    if (heroScene) heroScene.textContent = icon;
+    if (heroSceneMini) heroSceneMini.textContent = icon;
+    if (heroShift) heroShift.textContent = saludo;
+    if (heroSaludo) heroSaludo.textContent = `${saludo}, bienvenido al sistema`;
 
-    const dias = [
-      "Domingo",
-      "Lunes",
-      "Martes",
-      "Miércoles",
-      "Jueves",
-      "Viernes",
-      "Sábado"
-    ];
+    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
-    const meses = [
-      "enero",
-      "febrero",
-      "marzo",
-      "abril",
-      "mayo",
-      "junio",
-      "julio",
-      "agosto",
-      "septiembre",
-      "octubre",
-      "noviembre",
-      "diciembre"
-    ];
-
-    heroFechaCorta.textContent = dias[now.getDay()];
-    heroFechaLarga.textContent = `${String(now.getDate()).padStart(2, "0")} de ${meses[now.getMonth()]} de ${now.getFullYear()}`;
-    heroHora.textContent = now.toLocaleTimeString("es-PE");
+    if (heroFechaCorta) heroFechaCorta.textContent = dias[now.getDay()];
+    if (heroFechaLarga) heroFechaLarga.textContent = `${String(now.getDate()).padStart(2, "0")} de ${meses[now.getMonth()]} de ${now.getFullYear()}`;
+    if (heroHora) heroHora.textContent = now.toLocaleTimeString("es-PE");
 
     const hourDeg = ((hour % 12) + minute / 60) * 30;
     const minuteDeg = (minute + second / 60) * 6;
@@ -181,17 +150,9 @@ const apps = [
     const minuteHand = document.getElementById("minuteHand");
     const secondHand = document.getElementById("secondHand");
 
-    if (hourHand) {
-      hourHand.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
-    }
-
-    if (minuteHand) {
-      minuteHand.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
-    }
-
-    if (secondHand) {
-      secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
-    }
+    if (hourHand) hourHand.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
+    if (minuteHand) minuteHand.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
+    if (secondHand) secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
   }
 
   renderApps();
