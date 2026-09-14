@@ -30,7 +30,6 @@
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       throw new Error("Configure las credenciales de Supabase en js/api.js");
     }
-
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
       throw new Error("La librería de Supabase no está cargada o está cargando después de js/api.js");
     }
@@ -59,7 +58,7 @@
     return date.toISOString().slice(0, 10);
   }
 
-  // --- CORRECCIÓN: Genera fecha local en formato DD/MM/AAAA HH:MM:SS ---
+  // Genera fecha local (Perú) para guardar en BD
   function formatLocalNowApi() {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -68,19 +67,14 @@
     const hh = String(now.getHours()).padStart(2, "0");
     const mi = String(now.getMinutes()).padStart(2, "0");
     const ss = String(now.getSeconds()).padStart(2, "0");
-    
-    // Retorna formato DD/MM/AAAA HH:MM:SS
     return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
   }
 
-  // Ayudante para que JavaScript ordene fechas DD/MM/AAAA sin fallar
   function parseDateForSort(dateStr) {
     const raw = String(dateStr || "").trim();
     if (!raw) return 0;
-    // Si tiene formato AAAA-MM-DD
     let match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (match) return new Date(raw).getTime();
-    // Si tiene formato DD/MM/AAAA
     match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (match) {
       const [, d, m, y, h = "0", mi = "0", s = "0"] = match;
@@ -89,7 +83,6 @@
     return 0;
   }
 
-  // Convierte "LOTE 11" a "lote_11" para que coincida con la columna en Supabase
   function formatColumnName(name) {
     return String(name).trim().toLowerCase().replace(/\s+/g, '_');
   }
@@ -120,7 +113,6 @@
     };
   }
 
-  // Helper para generar el ID (LOT-XXXXXX)
   async function getNextLoteId(db, tableName) {
     const { data, error } = await db
       .from(tableName)
@@ -261,20 +253,15 @@
             let query = db.from(item.table).select("*");
             if (payload.cliente) query = query.ilike("cliente", `%${payload.cliente}%`);
             if (payload.estado) query = query.ilike("estado", `%${payload.estado}%`);
-            
-            // Si hay filtro de fecha, usamos Like ya que ahora es texto DD/MM/YYYY
             if (payload.fecha) {
               const fechaBuscada = String(payload.fecha).trim();
               query = query.ilike("fecha_registro", `${fechaBuscada}%`);
             }
-            
             const { data, error } = await query;
             if (error) { console.warn(`Error consultando ${item.table}:`, error.message); continue; }
             const formattedRows = (data || []).map((row) => formatLoteRecord(row, item.table, item.groupKey));
             rows = rows.concat(formattedRows);
           }
-          
-          // Usamos el parseador especial para ordenar por la fecha más reciente
           rows.sort((a, b) => parseDateForSort(b.fecha) - parseDateForSort(a.fecha));
           return { ok: true, rows };
         }
@@ -396,7 +383,7 @@
           const newId = "CHK-" + String(nextNum).padStart(6, '0');
 
           const user = JSON.parse(localStorage.getItem("authUser") || "{}");
-          const nowStr = formatLocalNowApi(); // <- Usa el nuevo formato de fecha DD/MM/AAAA
+          const nowStr = formatLocalNowApi();
 
           const insertData = {
             id_checklist: newId,
@@ -438,7 +425,8 @@
         }
 
         case "getChecklistMeta": {
-          throw new Error("Usar metadata local");
+          // CORRECCIÓN: Devolvemos ok: true para evitar el error en consola y que cargue normal.
+          return { ok: true, message: "Usando metadata local" };
         }
 
         case "exportChecklistData": {
