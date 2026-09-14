@@ -1,79 +1,111 @@
-const STORAGE_KEYS = {
-  token: "ct_token",
-  user: "ct_user"
-};
+// js/auth.js
+(function () {
+  "use strict";
 
-function getProjectContext() {
-  const path = window.location.pathname.toLowerCase();
-  const inMenuFolder = path.includes("/menu-opciones/");
-
-  return {
-    inMenuFolder,
-    indexUrl: inMenuFolder ? "../index.html" : "./index.html",
-    menuUrl: inMenuFolder ? "./menu.html" : "./Menu-Opciones/menu.html"
+  const STORAGE_KEYS = {
+    token: "ct_token",
+    user: "ct_user"
   };
-}
 
-function getIndexUrl() {
-  return getProjectContext().indexUrl;
-}
+  function getProjectContext() {
+    const path = window.location.pathname.toLowerCase();
+    const inMenuFolder = path.includes("/menu-opciones/");
 
-function getMenuUrl() {
-  return getProjectContext().menuUrl;
-}
+    return {
+      inMenuFolder,
+      indexUrl: inMenuFolder ? "../index.html" : "./index.html",
+      menuUrl: inMenuFolder ? "./menu.html" : "./Menu-Opciones/menu.html"
+    };
+  }
 
-function normalizeAuthUser(user) {
-  return {
-    ...user,
-    usuario: user?.username || user?.usuario || "",
-    cargo: user?.rol || user?.cargo || "USUARIO",
-    nombre: user?.nombre || user?.username || "Usuario"
-  };
-}
+  function getIndexUrl() {
+    return getProjectContext().indexUrl;
+  }
 
-function saveSession(session) {
-  const normalizedUser = normalizeAuthUser(session.user || {});
+  function getMenuUrl() {
+    return getProjectContext().menuUrl;
+  }
 
-  localStorage.setItem(STORAGE_KEYS.token, session.token || "");
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(normalizedUser));
+  function normalizeAuthUser(user) {
+    return {
+      ...user,
+      usuario: user?.usuario || user?.username || "",
+      username: user?.username || user?.usuario || "",
+      cargo: user?.cargo || user?.rol || "USUARIO",
+      rol: user?.rol || user?.cargo || "USUARIO",
+      nombre: user?.nombre || user?.username || user?.usuario || "Usuario",
+      area: user?.area || "",
+      foto: user?.foto || "",
+      fotoWeb: user?.fotoWeb || user?.foto || ""
+    };
+  }
 
-  localStorage.setItem("authUser", JSON.stringify(normalizedUser));
-  sessionStorage.setItem("authUser", JSON.stringify(normalizedUser));
-}
+  function saveSession(session) {
+    const token = session?.token || session?.session?.token || "";
+    const normalizedUser = normalizeAuthUser(session?.user || session?.session || {});
 
-function getToken() {
-  return localStorage.getItem(STORAGE_KEYS.token) || "";
-}
+    localStorage.setItem(STORAGE_KEYS.token, token);
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(normalizedUser));
 
-function getUser() {
-  const raw = localStorage.getItem(STORAGE_KEYS.user);
-  return raw ? JSON.parse(raw) : null;
-}
+    localStorage.setItem("authUser", JSON.stringify(normalizedUser));
+    sessionStorage.setItem("authUser", JSON.stringify(normalizedUser));
+  }
 
-function clearSession() {
-  localStorage.removeItem(STORAGE_KEYS.token);
-  localStorage.removeItem(STORAGE_KEYS.user);
-  localStorage.removeItem("authUser");
-  sessionStorage.removeItem("authUser");
-}
+  function getToken() {
+    return localStorage.getItem(STORAGE_KEYS.token) || "";
+  }
 
-async function logout() {
-  const token = getToken();
+  function getUser() {
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
 
-  try {
-    if (token) {
-      await apiPost("logout", { token });
+    if (!raw) {
+      return null;
     }
-  } catch (error) {
-    console.error("No se pudo cerrar sesión en servidor:", error);
-  } finally {
-    clearSession();
-    window.location.replace(getIndexUrl());
-  }
-}
 
-function requireAuth() {
-  if (!getToken()) {
-    window.location.replace(getIndexUrl());
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error("No se pudo leer el usuario guardado:", error);
+      return null;
+    }
   }
-}
+
+  function clearSession() {
+    localStorage.removeItem(STORAGE_KEYS.token);
+    localStorage.removeItem(STORAGE_KEYS.user);
+    localStorage.removeItem("authUser");
+    sessionStorage.removeItem("authUser");
+  }
+
+  async function logout() {
+    const token = getToken();
+
+    try {
+      if (token && typeof window.apiPost === "function") {
+        await window.apiPost("logout", { token });
+      }
+    } catch (error) {
+      console.error("No se pudo cerrar sesión en servidor:", error);
+    } finally {
+      clearSession();
+      window.location.replace(getIndexUrl());
+    }
+  }
+
+  function requireAuth() {
+    if (!getToken()) {
+      window.location.replace(getIndexUrl());
+    }
+  }
+
+  window.getProjectContext = getProjectContext;
+  window.getIndexUrl = getIndexUrl;
+  window.getMenuUrl = getMenuUrl;
+  window.normalizeAuthUser = normalizeAuthUser;
+  window.saveSession = saveSession;
+  window.getToken = getToken;
+  window.getUser = getUser;
+  window.clearSession = clearSession;
+  window.logout = logout;
+  window.requireAuth = requireAuth;
+})();
