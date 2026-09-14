@@ -257,7 +257,7 @@
           return { ok: true, rows };
         }
 
-// --- NUEVAS FUNCIONES PARA CREAR Y EDITAR REGISTROS ---
+        // --- NUEVAS FUNCIONES PARA CREAR Y EDITAR REGISTROS ---
 
         case "createLoteRecord": {
           const { cliente, campos, comentario } = payload;
@@ -358,55 +358,68 @@
         // ==========================================
         // 3. MÓDULO DE CHECKLISTS
         // ==========================================
-        
-        // ==========================================
-        // 3. MÓDULO DE CHECKLISTS
-        // ==========================================
         case "createChecklistRecord": {
           const { tipo, fechaChecklist, nExpo, pais, responsable, ubicacion, respuestas } = payload;
-          const tableName = tipo === "INSUMOS" ? "checklist_insumos" : "checklist_area";
+          
+          // Nombres exactos de tus tablas en Supabase
+          const tableName = tipo === "INSUMOS" ? "CHECKLIST_INSUMOS" : "CHECKLIST_AREA";
 
-          // Generar ID Correlativo
+          // Generar ID Correlativo basado en tu columna id_checklist (ej: CHK-000010)
           const { data: lastRecord } = await db
             .from(tableName)
-            .select("id_registro")
-            .order("id_registro", { ascending: false })
+            .select("id_checklist")
+            .order("id_checklist", { ascending: false })
             .limit(1)
             .maybeSingle();
 
           let nextNum = 1;
-          if (lastRecord && lastRecord.id_registro) {
-            const match = lastRecord.id_registro.match(/CHK-(?:INS|ARE)-(\d+)/);
+          if (lastRecord && lastRecord.id_checklist) {
+            const match = lastRecord.id_checklist.match(/CHK-(\d+)/);
             if (match) nextNum = parseInt(match[1], 10) + 1;
           }
           
-          const prefix = tipo === "INSUMOS" ? "CHK-INS-" : "CHK-ARE-";
-          const newId = prefix + String(nextNum).padStart(6, '0');
+          const newId = "CHK-" + String(nextNum).padStart(6, '0');
 
           const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const nowStr = formatLocalNowApi();
 
-          // Crear Objeto a guardar
+          // Crear Objeto a guardar con los nombres EXACTOS de tus columnas comunes
           const insertData = {
-            id_registro: newId,
-            fecha: fechaChecklist,
-            n_expo: nExpo,
+            id_checklist: newId,
+            fecha_registro: nowStr,
+            tipo_checklist: tipo,
+            fecha_checklist: fechaChecklist,
+            n_expo: parseInt(nExpo, 10) || null, // Convertido a número para int8
             pais: pais,
             responsable: responsable,
             usuario_login: user.email || user.usuario || "",
-            nombre_usuario: user.nombre || "Usuario"
+            nombre_usuario: user.nombre || "Usuario",
+            rol_usuario: user.cargo || user.rol || "USUARIO",
+            estado: "REGISTRADO",
+            ultima_actualizacion: nowStr
           };
 
+          // Si es área, agregamos la ubicación
           if (tipo === "AREA") {
             insertData.ubicacion = ubicacion;
           }
 
-          // Convertir respuestas en columnas (ej: "pregunta_1", "comentario_pregunta_1")
+          // Mapeo de respuestas adaptado a las columnas exactas de cada tabla
           if (respuestas) {
             Object.keys(respuestas).forEach(key => {
-              const colName = key.toLowerCase();
+              const colName = key.toLowerCase(); // ej: "stretch_film" o "pregunta_1"
               const ans = respuestas[key];
-              insertData[colName] = ans.estado || ans.respuesta || "";
-              insertData[`comentario_${colName}`] = ans.comentario || ""; 
+              
+              if (tipo === "INSUMOS") {
+                // Insumos usa el sufijo "_estado"
+                insertData[`${colName}_estado`] = ans.estado || "";
+              } else {
+                // Area usa el sufijo "_respuesta"
+                insertData[`${colName}_respuesta`] = ans.respuesta || "";
+              }
+              
+              // Ambos usan "_comentario"
+              insertData[`${colName}_comentario`] = ans.comentario ? ans.comentario : null; 
             });
           }
 
@@ -415,13 +428,14 @@
 
           return { ok: true, id: newId };
         }
+
         case "getChecklistMeta": {
           throw new Error("Usar metadata local");
         }
 
         case "exportChecklistData": {
-          const { data: insumos, error: errInsumos } = await db.from("checklist_insumos").select("*");
-          const { data: areas, error: errAreas } = await db.from("checklist_area").select("*");
+          const { data: insumos, error: errInsumos } = await db.from("CHECKLIST_INSUMOS").select("*");
+          const { data: areas, error: errAreas } = await db.from("CHECKLIST_AREA").select("*");
           if (errInsumos || errAreas) throw new Error("Error exportando información de checklist.");
 
           const objToArray = function (dataArray) {
