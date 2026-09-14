@@ -1,3 +1,4 @@
+// cabecera.js
 document.addEventListener("DOMContentLoaded", () => {
   const contenedor = document.getElementById("contenedor-cabecera");
   if (!contenedor) return;
@@ -12,7 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const pageInfo = getPageInfo();
   const nombreUsuario = String(user.nombre || user.username || user.usuario || "Usuario").trim();
-  const cargoUsuario = String(user.rol || user.cargo || "USUARIO").trim();
+  
+  // CORRECCIÓN: Leer primero 'cargo' en lugar de 'rol'
+  const cargoUsuario = String(user.cargo || user.rol || "USUARIO").trim();
+  
   const inicialesUsuario = obtenerIniciales(nombreUsuario);
 
   contenedor.innerHTML = `
@@ -124,18 +128,44 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-function ensureLogoutModal() {
-  let modal = document.getElementById("logoutModal");
+  function ensureLogoutModal() {
+    let modal = document.getElementById("logoutModal");
 
-  if (modal) return modal;
+    if (modal) return modal;
 
-  modal = document.createElement("div");
-  modal.id = "logoutModal";
-  modal.className = "logout-modal-backdrop";
+    modal = document.createElement("div");
+    modal.id = "logoutModal";
+    modal.className = "logout-modal-backdrop";
 
-  modal.innerHTML = `
-    <div class="logout-modal-box">
-      <div id="logoutModalContent">
+    modal.innerHTML = `
+      <div class="logout-modal-box">
+        <div id="logoutModalContent">
+          <h3>Cerrar sesión</h3>
+          <p>¿Desea cerrar sesión?</p>
+
+          <div class="logout-modal-actions">
+            <button type="button" class="logout-modal-btn cancel" id="logoutCancelBtn">
+              Cancelar
+            </button>
+
+            <button type="button" class="logout-modal-btn accept" id="logoutAcceptBtn">
+              Aceptar
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function showLogoutConfirm() {
+    return new Promise((resolve) => {
+      const modal = ensureLogoutModal();
+      const content = document.getElementById("logoutModalContent");
+
+      content.innerHTML = `
         <h3>Cerrar sesión</h3>
         <p>¿Desea cerrar sesión?</p>
 
@@ -148,113 +178,72 @@ function ensureLogoutModal() {
             Aceptar
           </button>
         </div>
-      </div>
-    </div>
-  `;
+      `;
 
-  document.body.appendChild(modal);
+      modal.classList.add("is-open");
 
-  return modal;
-}
+      document.getElementById("logoutCancelBtn").onclick = () => {
+        modal.classList.remove("is-open");
+        resolve(false);
+      };
 
-function showLogoutConfirm() {
-  return new Promise((resolve) => {
+      document.getElementById("logoutAcceptBtn").onclick = () => {
+        resolve(true);
+      };
+    });
+  }
+
+  function showLogoutLoading() {
     const modal = ensureLogoutModal();
     const content = document.getElementById("logoutModalContent");
 
     content.innerHTML = `
-      <h3>Cerrar sesión</h3>
-      <p>¿Desea cerrar sesión?</p>
-
-      <div class="logout-modal-actions">
-        <button type="button" class="logout-modal-btn cancel" id="logoutCancelBtn">
-          Cancelar
-        </button>
-
-        <button type="button" class="logout-modal-btn accept" id="logoutAcceptBtn">
-          Aceptar
-        </button>
+      <div class="logout-loader">
+        <div class="logout-loader-spinner"></div>
+        <div>
+          <h3 style="margin-bottom:4px;">Cerrando sesión...</h3>
+          <p>Espere un momento.</p>
+        </div>
       </div>
     `;
 
     modal.classList.add("is-open");
-
-    document.getElementById("logoutCancelBtn").onclick = () => {
-      modal.classList.remove("is-open");
-      resolve(false);
-    };
-
-    document.getElementById("logoutAcceptBtn").onclick = () => {
-      resolve(true);
-    };
-  });
-}
-
-function showLogoutLoading() {
-  const modal = ensureLogoutModal();
-  const content = document.getElementById("logoutModalContent");
-
-  content.innerHTML = `
-    <div class="logout-loader">
-      <div class="logout-loader-spinner"></div>
-
-      <div>
-        <h3 style="margin-bottom:4px;">Cerrando sesión...</h3>
-        <p>Espere un momento.</p>
-      </div>
-    </div>
-  `;
-
-  modal.classList.add("is-open");
-}
-
-async function ejecutarLogout(event) {
-  event?.preventDefault();
-  event?.stopPropagation();
-
-  cerrarDropdown();
-
-  const confirmar = await showLogoutConfirm();
-
-  if (!confirmar) return;
-
-  showLogoutLoading();
-
-  try {
-    if (typeof logout === "function") {
-      await logout();
-      return;
-    }
-
-    localStorage.removeItem("authUser");
-    sessionStorage.removeItem("authUser");
-    localStorage.removeItem("ct_token");
-    localStorage.removeItem("ct_user");
-
-    window.location.replace(routes.indexUrl);
-
-  } catch (error) {
-    console.error("Error cerrando sesión:", error);
-
-    localStorage.removeItem("authUser");
-    sessionStorage.removeItem("authUser");
-    localStorage.removeItem("ct_token");
-    localStorage.removeItem("ct_user");
-
-    window.location.replace(routes.indexUrl);
   }
-}
 
-logoutBtnDesktop?.addEventListener("click", ejecutarLogout);
-logoutBtnDropdown?.addEventListener("click", ejecutarLogout);
+  async function ejecutarLogout(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
 
+    cerrarDropdown();
+    const confirmar = await showLogoutConfirm();
+
+    if (!confirmar) return;
+    showLogoutLoading();
+
+    try {
+      if (typeof window.logout === "function") {
+        await window.logout();
+        return;
+      }
+    } catch (error) {
+      console.error("Error cerrando sesión:", error);
+    } finally {
+      localStorage.removeItem("authUser");
+      sessionStorage.removeItem("authUser");
+      localStorage.removeItem("ct_token");
+      localStorage.removeItem("ct_user");
+      window.location.replace(routes.indexUrl);
+    }
+  }
+
+  logoutBtnDesktop?.addEventListener("click", ejecutarLogout);
+  logoutBtnDropdown?.addEventListener("click", ejecutarLogout);
 
   cargarFotoCabecera(user);
 
   function getStoredAuthUser() {
     const raw = localStorage.getItem("authUser") || sessionStorage.getItem("authUser");
     if (!raw) return null;
-
     try {
       return JSON.parse(raw);
     } catch {
@@ -276,28 +265,13 @@ logoutBtnDropdown?.addEventListener("click", ejecutarLogout);
 
   function getPageInfo() {
     const path = window.location.pathname.toLowerCase();
-
     if (path.includes("/menu-opciones/menu")) {
-      return {
-        isMenuPage: true,
-        title: "Menú Principal",
-        subtitle: "Aplicativos disponibles"
-      };
+      return { isMenuPage: true, title: "Menú Principal", subtitle: "Aplicativos disponibles" };
     }
-
     if (path.includes("/temperatura")) {
-      return {
-        isMenuPage: false,
-        title: "Control de Temperatura",
-        subtitle: "Carga y análisis de registros"
-      };
+      return { isMenuPage: false, title: "Control de Temperatura", subtitle: "Carga y análisis de registros" };
     }
-
-    return {
-      isMenuPage: false,
-      title: "Sistema de Gestion Logistico",
-      subtitle: "Panel principal de operaciones"
-    };
+    return { isMenuPage: false, title: "Sistema de Gestion Logistico", subtitle: "Panel principal de operaciones" };
   }
 
   function obtenerIniciales(nombre) {
@@ -307,6 +281,18 @@ logoutBtnDropdown?.addEventListener("click", ejecutarLogout);
     return (partes[0][0] + partes[1][0]).toUpperCase();
   }
 
+  // CORRECCIÓN: Función para convertir links de Drive
+  function convertirLinkDrive(url) {
+    if (typeof url !== "string" || !url) return "";
+    const urlLimpia = url.trim();
+    const driveRegex = /\/file\/d\/([a-zA-Z0-9_-]+)/;
+    const match = urlLimpia.match(driveRegex);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return urlLimpia;
+  }
+
   function obtenerFuentesFoto(user) {
     return [
       user?.fotoDataUrl,
@@ -314,7 +300,8 @@ logoutBtnDropdown?.addEventListener("click", ejecutarLogout);
       user?.foto
     ]
       .map(v => typeof v === "string" ? v.trim() : "")
-      .filter(Boolean);
+      .filter(Boolean)
+      .map(url => convertirLinkDrive(url)); // Convertimos los links de Drive aquí
   }
 
   function cargarFotoCabecera(user) {
