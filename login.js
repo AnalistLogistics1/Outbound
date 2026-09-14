@@ -265,7 +265,7 @@
     });
   }
 
-  // Nueva función para convertir enlaces de Google Drive a imágenes directas
+  // FUNCIÓN ACTUALIZADA: Usa lh3.googleusercontent.com para evitar bloqueos
   function convertirLinkDrive(url) {
     if (typeof url !== "string" || !url) return "";
     const urlLimpia = url.trim();
@@ -275,7 +275,8 @@
     const match = urlLimpia.match(driveRegex);
     
     if (match && match[1]) {
-      return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+      // Este endpoint de Google permite cargar imágenes sin ser bloqueadas por CORS
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
     }
     
     return urlLimpia;
