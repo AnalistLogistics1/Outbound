@@ -358,6 +358,63 @@
         // ==========================================
         // 3. MÓDULO DE CHECKLISTS
         // ==========================================
+        
+        // ==========================================
+        // 3. MÓDULO DE CHECKLISTS
+        // ==========================================
+        case "createChecklistRecord": {
+          const { tipo, fechaChecklist, nExpo, pais, responsable, ubicacion, respuestas } = payload;
+          const tableName = tipo === "INSUMOS" ? "checklist_insumos" : "checklist_area";
+
+          // Generar ID Correlativo
+          const { data: lastRecord } = await db
+            .from(tableName)
+            .select("id_registro")
+            .order("id_registro", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          let nextNum = 1;
+          if (lastRecord && lastRecord.id_registro) {
+            const match = lastRecord.id_registro.match(/CHK-(?:INS|ARE)-(\d+)/);
+            if (match) nextNum = parseInt(match[1], 10) + 1;
+          }
+          
+          const prefix = tipo === "INSUMOS" ? "CHK-INS-" : "CHK-ARE-";
+          const newId = prefix + String(nextNum).padStart(6, '0');
+
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+
+          // Crear Objeto a guardar
+          const insertData = {
+            id_registro: newId,
+            fecha: fechaChecklist,
+            n_expo: nExpo,
+            pais: pais,
+            responsable: responsable,
+            usuario_login: user.email || user.usuario || "",
+            nombre_usuario: user.nombre || "Usuario"
+          };
+
+          if (tipo === "AREA") {
+            insertData.ubicacion = ubicacion;
+          }
+
+          // Convertir respuestas en columnas (ej: "pregunta_1", "comentario_pregunta_1")
+          if (respuestas) {
+            Object.keys(respuestas).forEach(key => {
+              const colName = key.toLowerCase();
+              const ans = respuestas[key];
+              insertData[colName] = ans.estado || ans.respuesta || "";
+              insertData[`comentario_${colName}`] = ans.comentario || ""; 
+            });
+          }
+
+          const { error: insErr } = await db.from(tableName).insert([insertData]);
+          if (insErr) throw new Error(insErr.message);
+
+          return { ok: true, id: newId };
+        }
         case "getChecklistMeta": {
           throw new Error("Usar metadata local");
         }
