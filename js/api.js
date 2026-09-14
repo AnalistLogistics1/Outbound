@@ -109,10 +109,12 @@
             throw new Error("Ingrese un usuario.");
           }
 
+// CAMBIO 1: Nombre de la tabla en MAYÚSCULAS
           const { data: userRow, error } = await db
-            .from("planilla")
+            .from("PLANILLA") 
             .select("*")
-            .ilike("usuario", usuarioInput)
+            // CAMBIO 2: Buscar en la columna "email"
+            .ilike("email", usuarioInput) 
             .limit(1)
             .maybeSingle();
 
@@ -124,19 +126,21 @@
             throw new Error("Usuario no encontrado.");
           }
 
-          if (action === "login" && String(userRow.password) !== String(claveInput)) {
+          // CAMBIO 3: Validar contra la columna "clave"
+          if (action === "login" && String(userRow.clave) !== String(claveInput)) {
             throw new Error("Contraseña incorrecta.");
           }
 
+          // CAMBIO 4: Ajustar la creación del usuario a tus columnas reales
           const user = {
-            usuario: userRow.usuario || "",
-            username: userRow.usuario || "",
-            nombre: userRow.nombre || userRow.usuario || "Usuario",
-            rol: userRow.rol || userRow.cargo || "USUARIO",
-            cargo: userRow.cargo || userRow.rol || "USUARIO",
-            area: userRow.area || "",
-            foto: userRow.foto || "",
-            fotoWeb: userRow.foto || ""
+            usuario: userRow.email || "",
+            username: userRow.email || "",
+            nombre: userRow.email || "Usuario", 
+            rol: "USUARIO", 
+            cargo: "USUARIO",
+            area: "",
+            foto: "",
+            fotoWeb: ""
           };
 
           if (action === "validarUsuario") {
