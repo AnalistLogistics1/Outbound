@@ -257,7 +257,7 @@
           return { ok: true, rows };
         }
 
-        // --- NUEVAS FUNCIONES PARA CREAR Y EDITAR REGISTROS ---
+// --- NUEVAS FUNCIONES PARA CREAR Y EDITAR REGISTROS ---
 
         case "createLoteRecord": {
           const { cliente, campos, comentario } = payload;
@@ -286,10 +286,12 @@
             ultima_actualizacion: nowStr
           };
 
-          // Los campos dinámicos se convierten a minúsculas y _ (ej. "LOTE 11" -> "lote_11")
+          // Filtramos los campos dinámicos para no intentar insertar columnas que ya manejamos (fecha, usuario, etc.)
           if (campos) {
             Object.keys(campos).forEach(k => {
-              insertData[formatColumnName(k)] = campos[k];
+              const colName = formatColumnName(k);
+              if (['fecha', 'usuario', 'cliente', 'comentario', 'estado'].includes(colName)) return; // Ignorar
+              insertData[colName] = campos[k];
             });
           }
 
@@ -338,9 +340,12 @@
           if (comentario !== undefined) updateData.comentario = comentario;
           if (estado !== undefined) updateData.estado = estado;
 
+          // Filtramos igual que en la creación
           if (campos) {
             Object.keys(campos).forEach(k => {
-              updateData[formatColumnName(k)] = campos[k];
+              const colName = formatColumnName(k);
+              if (['fecha', 'usuario', 'cliente', 'comentario', 'estado'].includes(colName)) return; // Ignorar
+              updateData[colName] = campos[k];
             });
           }
 
