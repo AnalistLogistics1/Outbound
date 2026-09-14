@@ -108,4 +108,52 @@
   window.clearSession = clearSession;
   window.logout = logout;
   window.requireAuth = requireAuth;
+
+  // --- AÑADIR ESTO AL FINAL DE AUTH.JS ---
+  
+  function convertirLinkDrive(url) {
+    if (typeof url !== "string" || !url) return "";
+    const urlLimpia = url.trim();
+    const driveRegex = /\/file\/d\/([a-zA-Z0-9_-]+)/;
+    const match = urlLimpia.match(driveRegex);
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return urlLimpia;
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const user = getUser();
+    if (!user) return;
+
+    // 1. Actualizar textos de la cabecera (Nombre y Cargo)
+    // Busca cualquier elemento HTML que contenga el nombre anterior y lo actualiza
+    const headerNameElems = document.querySelectorAll('.header-user-name, .user-name'); 
+    const headerRoleElems = document.querySelectorAll('.header-user-role, .user-role'); 
+    
+    headerNameElems.forEach(el => el.textContent = user.nombre || "Usuario");
+    headerRoleElems.forEach(el => el.textContent = (user.cargo || user.rol || "USUARIO").toUpperCase());
+
+    // 2. Reemplazar el círculo "CC" con la foto real del usuario
+    // Suponiendo que el círculo del avatar tiene una clase como .avatar o .user-avatar
+    const avatarContainers = document.querySelectorAll('.avatar, .user-avatar, .header-avatar');
+    
+    const fotoUrl = convertirLinkDrive(user.fotoWeb || user.foto);
+    
+    if (fotoUrl && avatarContainers.length > 0) {
+      avatarContainers.forEach(container => {
+        // Vaciamos el "CC"
+        container.textContent = ""; 
+        // Creamos la imagen
+        const img = document.createElement("img");
+        img.src = fotoUrl;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.borderRadius = "50%";
+        img.style.objectFit = "cover";
+        
+        container.appendChild(img);
+      });
+    }
+  });
 })();
