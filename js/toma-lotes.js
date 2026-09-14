@@ -924,9 +924,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       .replace(/[\u0300-\u036f]/g, "");
   }
 
-  function buildNormalizedDatosMap(datos) {
+function buildNormalizedDatosMap(datos) {
     const map = {};
-    Object.即可(datos || {}).forEach((key) => {
+    // AQUI ESTABA EL ERROR (decía Object.即可 en lugar de Object.keys)
+    Object.keys(datos || {}).forEach((key) => {
       map[normalizeExportKey(key)] = datos[key];
     });
     return map;
