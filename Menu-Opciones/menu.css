@@ -363,9 +363,10 @@ body {
 /* SECCIÓN */
 .apps-section {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
 }
+
 
 .section-head {
   width: 100%;
@@ -391,11 +392,12 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  gap: 32px;
-  flex-wrap: wrap;
+  gap: 22px;
+  flex-wrap: nowrap;
   width: 100%;
   margin-top: 12px;
 }
+
 
 
 .app-card {
