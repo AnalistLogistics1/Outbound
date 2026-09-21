@@ -56,7 +56,7 @@ const apps = [
       url: "../toma-lotes.html"
     },
     {
-      title: "Check List",
+      title: "Check List Exportación",
       desc: "Registro de check list de insumos y área para alistamiento de exportación.",
       pill: "Módulo activo",
       accent: "accent-blue",
