@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
-  const apps = [
+const apps = [
     {
       title: "Toma de Lotes",
       desc: "Registro y seguimiento logístico de lotes por cliente.",
@@ -64,8 +64,29 @@ document.addEventListener("DOMContentLoaded", () => {
       fallback: createThumb("CL", "#072B5C", "#f8b400", "Check List"),
       icon: "CL",
       url: "../check-list.html"
+    },
+    {
+      title: "Conteo Cíclico",
+      desc: "Registro y control de conteo cíclico de inventario.",
+      pill: "Módulo activo",
+      accent: "accent-blue",
+      image: resolveAsset("../img/inventario.jpg"),
+      fallback: createThumb("CC", "#0f4c81", "#f8b400", "Conteo Cíclico"),
+      icon: "CC",
+      url: "https://conteo-ciclico.pages.dev/conteo-ciclico/conteo"
+    },
+    {
+      title: "Auditoria Ciega Principal",
+      desc: "Registro y control de auditoría ciega de inventario.",
+      pill: "Módulo activo",
+      accent: "accent-blue",
+      image: resolveAsset("../img/auditoria.jpg"),
+      fallback: createThumb("AC", "#072B5C", "#38bdf8", "Auditoria Ciega"),
+      icon: "AC",
+      url: "https://analistlogistics1.github.io/AUDITORIA_CIEGA/"
     }
   ];
+
 
   // AQUI CORREGIMOS EL SALUDO Y EL CARGO EN LA INTERFAZ
   if (mensajeBienvenida) {
