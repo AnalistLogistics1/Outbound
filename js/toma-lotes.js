@@ -285,7 +285,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 scannerStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          facingMode: "environment"
+          facingMode: "environment",
+          // Resolución HD equilibrada: nitidez perfecta sin forzar el zoom excesivo
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
       });
 
