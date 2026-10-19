@@ -288,7 +288,6 @@ scannerStream = await navigator.mediaDevices.getUserMedia({
           facingMode: { ideal: "environment" },
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-          // Petición inicial para forzar enfoque continuo en navegadores que lo soporten desde el inicio
           focusMode: { ideal: "continuous" }
         }
       });
@@ -301,28 +300,17 @@ scannerStream = await navigator.mediaDevices.getUserMedia({
         const capabilities = track.getCapabilities ? track.getCapabilities() : {};
         const advanced = [];
 
-        // 1. Confirmar y forzar nuevamente el enfoque continuo
+        // Solo mantenemos la instrucción de enfoque continuo sin alterar el zoom
         if (capabilities.focusMode && capabilities.focusMode.includes("continuous")) {
           advanced.push({ focusMode: "continuous" });
-        }
-
-        // 2. Aplicar zoom digital controlado
-        // Esto evita que tengas que acercar o alejar el celular demasiado, permitiendo que la cámara enfoque a su distancia natural.
-        if (capabilities.zoom) {
-          const minZoom = capabilities.zoom.min || 1;
-          const maxZoom = capabilities.zoom.max || 3;
-          // Aplicamos un zoom moderado (ej. 2x o 2.5x), garantizando no exceder el límite físico del lente
-          const targetZoom = Math.min(minZoom + 1.5, maxZoom); 
-          advanced.push({ zoom: targetZoom });
         }
 
         if (advanced.length > 0) {
           await track.applyConstraints({ advanced });
         }
       } catch (e) {
-        console.warn("No se pudo aplicar enfoque avanzado o zoom:", e);
+        console.warn("No se pudo aplicar enfoque avanzado:", e);
       }
-
       scannerRunning = true;
       setScannerMessage("Centre el código dentro del recuadro.");
       scanLoop();
