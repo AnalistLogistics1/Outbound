@@ -285,10 +285,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 scannerStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          focusMode: { ideal: "continuous" }
+          facingMode: "environment"
         }
       });
 
