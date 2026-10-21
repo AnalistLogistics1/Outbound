@@ -75,7 +75,7 @@ const apps = [
       icon: "CC",
       url: "https://conteo-ciclico.pages.dev/conteo-ciclico/conteo"
     },
-    {
+{
       title: "Auditoria Ciega Principal",
       desc: "Registro y control de auditoría ciega de inventario.",
       pill: "Módulo activo",
@@ -84,6 +84,16 @@ const apps = [
       fallback: createThumb("AC", "#072B5C", "#38bdf8", "Auditoria Ciega"),
       icon: "AC",
       url: "https://analistlogistics1.github.io/AUDITORIA_CIEGA/"
+    },
+    {
+      title: "Pedidos Adicionales",
+      desc: "Tracker de pedidos y seguimiento logístico.",
+      pill: "Módulo activo",
+      accent: "accent-blue",
+      image: resolveAsset("../img/adicional.jpg"),
+      fallback: createThumb("PA", "#0f4c81", "#38bdf8", "Pedidos Adicionales"),
+      icon: "PA",
+      url: "../pedidos-adicionales.html"
     }
   ];
 
