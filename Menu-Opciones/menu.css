@@ -392,8 +392,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  gap: 22px;
-  flex-wrap: wrap; /* Cambio de nowrap a wrap para evitar desbordamiento */
+  gap: 16px; /* Reducido de 22px para dar espacio a la 5ta tarjeta */
+  flex-wrap: wrap; /* Activado para que baje a la siguiente línea en pantallas pequeñas */
   width: 100%;
   margin-top: 12px;
 }
@@ -412,7 +412,7 @@ body {
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
   transition: all 0.25s ease;
-  width: 255px;
+  width: 216px; /* Reducido de 255px para que entren 5 en escritorio */
   margin: 0;
 }
 
@@ -432,7 +432,7 @@ body {
 
 .app-media {
   position: relative;
-  height: 220px;
+  height: 170px; /* Reducido de 220px para mantener proporción con el nuevo ancho */
   overflow: hidden;
   background: #ffffff;
   padding: 14px;
@@ -520,17 +520,14 @@ body {
   .hero-panel {
     grid-template-columns: 1fr;
   }
-
   .apps-grid {
-    gap: 28px;
+    gap: 18px;
   }
-
   .app-card {
-    width: 240px;
+    width: 220px; /* En tablet, saltarán automáticamente a múltiples filas */
   }
-
   .app-media {
-    height: 210px;
+    height: 180px;
   }
 }
 
