@@ -393,7 +393,7 @@ body {
   justify-content: center;
   align-items: flex-start;
   gap: 22px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap; /* Cambio de nowrap a wrap para evitar desbordamiento */
   width: 100%;
   margin-top: 12px;
 }
