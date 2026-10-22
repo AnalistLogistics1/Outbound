@@ -31,20 +31,29 @@
       </button>
     </section>
 
-<!-- Tracker de Registros -->
-    <section class="table-card" style="margin-top: 24px;">
-      <div class="table-head">
-        <div>
-          <h3>Tracker de solicitudes</h3>
-          <p>Historial de registros generados por los solicitantes.</p>
-        </div>
+<!-- Controles Superiores de Tablas -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px; margin-bottom: -15px; position: relative; z-index: 2;">
+      <!-- Tabs / Sub-botones -->
+      <div class="tracker-tabs" style="display: flex; gap: 10px;">
+        <button id="tabRecepcion" class="btn-tab active">Tracker Recepción</button>
+        <button id="tabDespacho" class="btn-tab">Tracker Despachos</button>
       </div>
-      <div class="table-wrap">
+
+      <!-- Botón de Aprobación Masiva (Oculto por defecto) -->
+      <button id="btnAprobarSeleccionados" class="btn btn-primary" style="display: none; height: 38px; padding: 0 20px; box-shadow: 0 -4px 10px rgba(15, 23, 42, 0.05); border-radius: 12px 12px 0 0;">
+        Aprobar Seleccionados (<span id="countSeleccionados">0</span>)
+      </button>
+    </div>
+
+    <!-- Tracker de Registros Separados -->
+    <section class="table-card" style="margin-top: 15px;">
+      
+      <!-- Vista Recepción -->
+      <div id="viewRecepcion" class="table-wrap">
         <table>
-          <thead>
+          <thead style="background: #f8fafc;">
             <tr>
               <th>ID</th>
-              <th>Tipo</th>
               <th>Fecha</th>
               <th>Solicitante</th>
               <th>Estado</th>
@@ -53,11 +62,34 @@
               <th style="text-align:center;">Acción</th>
             </tr>
           </thead>
-          <tbody id="tablaTracker">
-            <tr><td colspan="8" class="empty">Cargando registros...</td></tr>
+          <tbody id="tablaTrackerRecepcion">
+            <tr><td colspan="7" class="empty">Cargando registros...</td></tr>
           </tbody>
         </table>
       </div>
+
+      <!-- Vista Despacho -->
+      <div id="viewDespacho" class="table-wrap" style="display: none;">
+        <table>
+          <thead style="background: #d4d4d4;">
+            <tr>
+              <th>Despacho (ID)</th>
+              <th>Cliente</th>
+              <th>Pedido</th>
+              <th>OC</th>
+              <th>Valor</th>
+              <th>Fecha</th>
+              <th>Solicitante</th>
+              <th>Estado</th>
+              <th style="text-align:center;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tablaTrackerDespacho">
+            <tr><td colspan="9" class="empty">Cargando registros...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
     </section>
   </main>
 

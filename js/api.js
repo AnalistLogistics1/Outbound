@@ -473,10 +473,32 @@ case "exportChecklistData": {
           return { ok: true, count: insertData.length };
         }
 
-        case "listPedidosAdicionales": {
+case "listPedidosAdicionales": {
           const { data, error } = await db.from("pedidos_adicionales").select("*").order("fecha_registro", { ascending: false });
           if (error) throw new Error(error.message);
           return { ok: true, rows: data || [] };
+        }
+
+        // ==========================================
+        // 5. APROBACIÓN DE PEDIDOS (NUEVO)
+        // ==========================================
+        case "aprobarPedidosAdicionales": {
+          // Payload debe ser un array de IDs: ["REQ-123", "REQ-456"]
+          if (!Array.isArray(payload) || payload.length === 0) {
+            throw new Error("Debe seleccionar al menos un registro para aprobar.");
+          }
+          
+          const nowStr = formatLocalNowApi();
+          const { error } = await db
+            .from("pedidos_adicionales")
+            .update({ 
+              estado: "APROBADO", 
+              ultima_actualizacion: nowStr 
+            })
+            .in("id_registro", payload);
+
+          if (error) throw new Error(error.message);
+          return { ok: true, count: payload.length };
         }
 
         default:
