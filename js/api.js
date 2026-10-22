@@ -467,13 +467,14 @@ case "exportChecklistData": {
             };
           });
 
-          const { error } = await db.from("PEDIDOS_ADICIONALES").insert(insertData);
+// CORRECCIÓN: Nombre de tabla en minúsculas coincidiendo con Supabase
+          const { error } = await db.from("pedidos_adicionales").insert(insertData);
           if (error) throw new Error(error.message);
           return { ok: true, count: insertData.length };
         }
 
         case "listPedidosAdicionales": {
-          const { data, error } = await db.from("PEDIDOS_ADICIONALES").select("*").order("fecha_registro", { ascending: false });
+          const { data, error } = await db.from("pedidos_adicionales").select("*").order("fecha_registro", { ascending: false });
           if (error) throw new Error(error.message);
           return { ok: true, rows: data || [] };
         }

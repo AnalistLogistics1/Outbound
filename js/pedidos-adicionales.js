@@ -12,15 +12,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const modalDespacho = document.getElementById("modalDespacho");
   const tablaTracker = document.getElementById("tablaTracker");
 
-  // Elementos de Carga y Notificación
   const customLoader = document.getElementById("customLoader");
   const loaderTitle = document.getElementById("loaderTitle");
   const loaderDesc = document.getElementById("loaderDesc");
   const toast = document.getElementById("toast");
+  
+  // Modal de Éxito
+  const successModal = document.getElementById("successModal");
+  const successMessage = document.getElementById("successMessage");
+  const btnCerrarSuccess = document.getElementById("btnCerrarSuccess");
 
   let pedidosDespachoTemp = []; 
 
-  // --- FUNCIONES UI (TOAST Y LOADER) ---
+  // --- FUNCIONES UI ---
   function showToast(message, type = "ok") {
     if (!toast) return;
     toast.textContent = message;
@@ -42,7 +46,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- CONTROL DE MODALES ---
+  function showSuccessModal(message) {
+    if (!successModal) return;
+    successMessage.textContent = message;
+    successModal.classList.add("is-open");
+    successModal.setAttribute("aria-hidden", "false");
+  }
+
+  if (btnCerrarSuccess) {
+    btnCerrarSuccess.addEventListener("click", () => {
+      successModal.classList.remove("is-open");
+      successModal.setAttribute("aria-hidden", "true");
+    });
+  }
+
   function abrirModal(modal) {
     if (!modal) return;
     document.body.classList.add("modal-open");
@@ -59,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnRecepcionMain) btnRecepcionMain.addEventListener("click", () => {
     modalRecepcion.querySelector("form").reset();
-    modalRecepcion.querySelector(".btn-primary").style.display = "block"; // Restaurar botón
+    modalRecepcion.querySelector(".btn-primary").style.display = "block"; 
     abrirModal(modalRecepcion);
   });
   
@@ -68,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSubTablaDespacho();
     modalDespacho.querySelector("form").reset();
     modalDespacho.querySelector("select").disabled = false; 
-    modalDespacho.querySelector(".btn-primary").style.display = "block"; // Restaurar botón
+    modalDespacho.querySelector(".btn-primary").style.display = "block"; 
     if (modalDespacho.querySelector(".btn-soft")) modalDespacho.querySelector(".btn-soft").style.display = "block";
     abrirModal(modalDespacho);
   });
@@ -77,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", (e) => cerrarModal(e.target.closest(".modal-backdrop")));
   });
 
-  // --- LÓGICA DESPACHO (ACUMULACIÓN) ---
+  // --- LÓGICA DESPACHO ---
   const btnAñadirPedido = modalDespacho?.querySelector(".btn-soft");
   const tbodyDespacho = modalDespacho?.querySelector("tbody");
   const inputCliente = modalDespacho?.querySelector("select");
@@ -105,7 +122,6 @@ document.addEventListener("DOMContentLoaded", () => {
       inputCliente.disabled = true; 
       renderSubTablaDespacho();
       
-      // Limpiar campos excepto cliente y comentarios
       inputs.forEach(inp => {
         if(inp.tagName !== "SELECT" && inp.tagName !== "TEXTAREA") inp.value = "";
       });
@@ -137,7 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderSubTablaDespacho();
   };
 
-  // --- ENVÍO A BASE DE DATOS ---
+  // --- ENVÍO A BASE DE DATOS Y MODAL DE ÉXITO ---
   const btnSolicitarDespacho = modalDespacho?.querySelector(".btn-primary");
   if (btnSolicitarDespacho) {
     btnSolicitarDespacho.addEventListener("click", async () => {
@@ -147,7 +163,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         await window.apiPost("savePedidoAdicional", pedidosDespachoTemp);
         cerrarModal(modalDespacho);
-        showToast("Pedidos solicitados correctamente.", "ok");
+        showSuccessModal("Pedidos solicitados correctamente.");
         await cargarTracker();
       } catch (error) { 
         showToast("Error: " + error.message, "error"); 
@@ -175,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
           detalles: detalle
         });
         cerrarModal(modalRecepcion);
-        showToast("Recepción registrada correctamente.", "ok");
+        showSuccessModal("Recepción registrada correctamente.");
         await cargarTracker();
       } catch (error) { 
         showToast("Error: " + error.message, "error"); 
@@ -185,7 +201,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- RENDERIZAR TRACKER GLOBAL ---
+  // --- CARGAR CLIENTES Y RENDERIZAR TRACKER ---
+  async function cargarClientes() {
+    try {
+      const meta = await window.apiPost("getLotesMeta", { token });
+      if (meta.clientes && meta.clientes.length > 0 && inputCliente) {
+        inputCliente.innerHTML = `<option value="">Buscar Clientes</option>` + 
+          meta.clientes.map(c => `<option value="${c}">${c}</option>`).join("");
+      }
+    } catch (error) {
+      console.warn("No se pudieron cargar los clientes:", error);
+    }
+  }
+
   async function cargarTracker() {
     if (!tablaTracker) return;
     try {
@@ -226,7 +254,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Visualizar Detalle en Modal (Modo Lectura)
   window.verDetalle = (id) => {
     const registro = window.trackerData.find(r => r.id_registro === id);
     if (!registro) return;
@@ -248,5 +275,5 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   toggleLoader(true, "Iniciando", "Cargando registros...");
-  cargarTracker().then(() => toggleLoader(false));
+  Promise.all([cargarClientes(), cargarTracker()]).then(() => toggleLoader(false));
 });
