@@ -1,12 +1,162 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tracker de Pedidos Adicionales</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pedidos Adicionales | Sistema Logístico</title>
+  <link rel="stylesheet" href="./part/cabecera.css" />
+  <link rel="stylesheet" href="./css/toma-lotes.css" />
+  <link rel="stylesheet" href="./css/pedidos-adicionales.css" />
+  <link rel="stylesheet" href="./part/footer.css" />
 </head>
 <body>
-  <h1>Interfaz en construcción: Tracker de Pedidos</h1>
-  <p>Aquí irá el tracker con privilegios por rol de usuario.</p>
+  <div id="contenedor-cabecera"></div>
+
+  <main class="page">
+    <section class="hero hero-centered">
+      <div>
+        <span class="eyebrow">Módulo logístico</span>
+        <h1>Pedidos Adicionales</h1>
+        <p>Gestión de Recepción y Despacho con flujo de aprobación.</p>
+      </div>
+    </section>
+
+    <!-- Botones Centrales -->
+    <section class="main-actions-grid">
+      <button id="btnRecepcionMain" class="btn-main-action btn-blue">
+        <span class="icon">📥</span> RECEPCIÓN
+      </button>
+      <button id="btnDespachoMain" class="btn-main-action btn-dark">
+        <span class="icon">📤</span> DESPACHO
+      </button>
+    </section>
+
+<!-- Tracker de Registros -->
+    <section class="table-card" style="margin-top: 24px;">
+      <div class="table-head">
+        <div>
+          <h3>Tracker de solicitudes</h3>
+          <p>Historial de registros generados por los solicitantes.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tipo</th>
+              <th>Fecha</th>
+              <th>Solicitante</th>
+              <th>Estado</th>
+              <th>Comentario</th>
+              <th style="text-align:center;">Detalle</th>
+              <th style="text-align:center;">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tablaTracker">
+            <tr><td colspan="8" class="empty">Cargando registros...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Recepción -->
+  <div class="modal-backdrop" id="modalRecepcion" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h2>RECEPCIÓN</h2>
+        <button type="button" class="modal-close" id="cerrarRecepcion">x</button>
+      </div>
+      <form class="modal-body">
+        <div class="dynamic-grid grid-3">
+          <div class="field"><label>Costos</label><input type="text" placeholder="Ingrese costos"></div>
+          <div class="field"><label>Contenedor</label><input type="text" placeholder="Ingrese contenedor"></div>
+          <div class="field"><label>N° Contenedores paletizado</label><input type="number" placeholder="Ingrese N° contenedor"></div>
+          
+          <div class="field"><label>N° Contenedores granell</label><input type="number" placeholder="Ingrese N° contenedor"></div>
+          <div class="field"><label>Fecha</label><input type="date"></div>
+          <div class="field"><label>Hora de llegada 12H</label><input type="time" placeholder="Ejemplo: 03:00 PM"></div>
+          
+          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios"></textarea></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary">Solicitar Aprobación</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Despacho -->
+  <div class="modal-backdrop" id="modalDespacho" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h2>DESPACHO</h2>
+        <button type="button" class="modal-close" id="cerrarDespacho">x</button>
+      </div>
+      <form class="modal-body">
+        <div class="dynamic-grid grid-3">
+          <div class="field">
+            <label>Cliente</label>
+            <select><option>Buscar Clientes</option></select>
+          </div>
+          <div class="field"><label>Pedido</label><input type="text" placeholder="Ingrese número de pedido"></div>
+          <div class="field"><label>OC</label><input type="text" placeholder="Ingrese número de OC"></div>
+          
+          <div class="field"><label>Valor Venta</label><input type="text" placeholder="$,00"></div>
+          <div class="field"><label>Fecha despacho</label><input type="date"></div>
+          <div class="field">
+            <label>Tipo</label>
+            <select>
+              <option>Despacho 24 H</option>
+              <option>Urgencia</option>
+            </select>
+          </div>
+          
+          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios"></textarea></div>
+        </div>
+
+        <!-- Sub-Grilla de Despacho -->
+        <div class="table-wrap" style="border: 1px solid var(--border); border-radius: 12px; margin-top: 14px; min-height: 120px;">
+          <table>
+            <thead style="background: #d4d4d4;">
+              <tr><th>Cliente</th><th>Pedido</th><th>OC</th><th>Valor</th><th>Fecha</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="empty">No hay pedidos añadidos</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 14px;">
+          <button type="button" class="btn btn-soft">Añadir pedido</button>
+          <button type="button" class="btn btn-primary">Solicitar Aprobación</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<!-- Custom Loader (Pantalla de carga con Logo) -->
+  <div class="custom-loader-backdrop" id="customLoader" aria-hidden="true">
+    <div class="custom-loader-card">
+      <div class="custom-loader-spinner">
+        <img src="./img/logo.png" alt="SLS Logo">
+      </div>
+      <h3 id="loaderTitle">Cargando...</h3>
+      <p id="loaderDesc">Por favor espere...</p>
+    </div>
+  </div>
+
+  <!-- Toast (Alertas Profesionales) -->
+  <div id="toast" class="toast"></div>
+
+  <!-- LIBRERÍA DE SUPABASE (Soluciona el error de carga) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./part/footer.js"></script>
+  <script src="./part/cabecera.js"></script>
+  <script src="./js/pedidos-adicionales.js"></script>
 </body>
 </html>

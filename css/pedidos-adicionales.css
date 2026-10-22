@@ -1,0 +1,172 @@
+/* Botones centrales */
+.main-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 20px;
+}
+
+.btn-main-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 28px;
+  border: none;
+  border-radius: 24px;
+  font-size: 24px;
+  font-weight: 900;
+  cursor: pointer;
+  color: #fff;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.15);
+}
+
+.btn-main-action:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+}
+
+.btn-blue {
+  background: linear-gradient(135deg, #072b5c, #0284c7);
+}
+
+.btn-dark {
+  background: linear-gradient(135deg, #0f172a, #334155);
+}
+
+/* Modales ajustados a 3 columnas para Recepción y Despacho */
+.modal-lg {
+  max-width: 1000px !important;
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 768px) {
+  .main-actions-grid {
+    grid-template-columns: 1fr;
+  }
+  .grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Colores de Estados en el Tracker */
+.badge-registrado {
+  background: #fef08a !important; /* Amarillo */
+  color: #854d0e !important;
+}
+
+.badge-aprobado {
+  background: #bbf7d0 !important; /* Verde */
+  color: #166534 !important;
+}
+
+.badge-cancelado {
+  background: #fecaca !important; /* Rojo */
+  color: #991b1b !important;
+}
+
+/* =========================================
+   CUSTOM LOADER (LOGO + SPINNER)
+   ========================================= */
+.custom-loader-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(100, 116, 139, 0.7); 
+  backdrop-filter: blur(4px);
+}
+
+.custom-loader-backdrop.is-open {
+  display: flex;
+}
+
+.custom-loader-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-loader-spinner {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 4px solid #e2e8f0;
+  border-top-color: #f59e0b; /* Amarillo/Naranja */
+  border-bottom-color: #0f4c81; /* Azul corporativo */
+  animation: spinLoader 1.2s linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+/* El logo gira en reversa a la misma velocidad para mantenerse estático */
+.custom-loader-spinner img {
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #000000; /* Fondo negro para el logo según la imagen */
+  animation: reverseSpin 1.2s linear infinite; 
+}
+
+@keyframes spinLoader { to { transform: rotate(360deg); } }
+@keyframes reverseSpin { to { transform: rotate(-360deg); } }
+
+.custom-loader-card h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.custom-loader-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* =========================================
+   TOAST (NOTIFICACIONES)
+   ========================================= */
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 100000;
+  display: none;
+  min-width: 250px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #0f172a;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  font-size: 14px;
+  font-weight: 700;
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast.is-show { display: block; }
+.toast.ok { background: #166534; } 
+.toast.error { background: #991b1b; } 
+.toast.warning { background: #b45309; } 
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

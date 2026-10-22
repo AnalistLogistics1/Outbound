@@ -85,7 +85,8 @@ const apps = [
       icon: "AC",
       url: "https://analistlogistics1.github.io/AUDITORIA_CIEGA/"
     },
-    {
+{
+      id: "PA", // Identificador añadido para validar permisos
       title: "Pedidos Adicionales",
       desc: "Tracker de pedidos y seguimiento logístico.",
       pill: "Módulo activo",
@@ -109,31 +110,67 @@ const apps = [
   if (mensajeDescripcion) mensajeDescripcion.textContent = "Seleccione el módulo que desea utilizar hoy.";
   if (heroTotalApps) heroTotalApps.textContent = `${apps.length} módulo${apps.length === 1 ? "" : "s"}`;
 
-  function renderApps() {
+function renderApps() {
     if (!appsGrid) return;
     appsGrid.innerHTML = "";
+    
+    // CORRECCIÓN: Leer explícitamente el 'rol' para los permisos (ignorar el cargo)
+    const userRole = (user?.rol || "USUARIO").toUpperCase();
+    
+    // Definir los grupos de roles
+    const rolesSoloPedidos = ["SOLICITANTE", "APROBADOR"];
+    const isSoloPedidos = rolesSoloPedidos.includes(userRole);
+    const isSuperAdmin = userRole === "SUPERADMIN";
+
     apps.forEach((app) => {
+      let isLocked = false;
+      let urlDestino = app.url;
+      let textoPill = app.pill;
+
+      // Lógica estricta de bloqueos según el ícono y el rol
+      if (app.id === "PA") {
+        // El 5to ícono solo es para Solicitante, Aprobador y Superadmin
+        if (!isSoloPedidos && !isSuperAdmin) {
+          isLocked = true;
+        }
+      } else {
+        // Los demás íconos (1 al 4) se bloquean para Solicitante y Aprobador
+        if (isSoloPedidos) {
+          isLocked = true;
+        }
+      }
+
+      if (isLocked) {
+        urlDestino = "#";
+        textoPill = "Sin acceso";
+      }
+
+      const disabledClass = (urlDestino === "#" || isLocked) ? " is-disabled" : "";
+      const imgFilter = isLocked ? 'style="filter: grayscale(100%); opacity: 0.6;"' : '';
+
       const card = document.createElement("article");
-      card.className = `app-card ${app.accent}${app.url === "#" ? " is-disabled" : ""}`;
+      card.className = `app-card ${app.accent}${disabledClass}`;
       card.innerHTML = `
         <div class="app-media">
-          <img src="${app.image}" alt="${app.title}">
+          <img src="${app.image}" alt="${app.title}" ${imgFilter}>
           <div class="app-media-overlay"></div>
         </div>
         <div class="app-card-body">
-          <span class="app-pill">${app.pill}</span>
+          <span class="app-pill" style="${isLocked ? 'background:#fee2e2; color:#991b1b;' : ''}">${textoPill}</span>
           <h3>${app.title}</h3>
           <p>${app.desc}</p>
           <div class="app-card-bottom">
-            <span>${app.url === "#" ? "Disponible pronto" : "Ingresar"}</span>
+            <span>${isLocked ? "No autorizado" : (urlDestino === "#" ? "Disponible pronto" : "Ingresar")}</span>
             <span>→</span>
           </div>
         </div>
       `;
       const img = card.querySelector("img");
       img.addEventListener("error", () => { img.src = app.fallback; });
-      if (app.url !== "#") {
-        card.addEventListener("click", () => { window.location.href = app.url; });
+      
+      // Solo permite redirección si no está bloqueado ni es un enlace vacío
+      if (urlDestino !== "#" && !isLocked) {
+        card.addEventListener("click", () => { window.location.href = urlDestino; });
       }
       appsGrid.appendChild(card);
     });

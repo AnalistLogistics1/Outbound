@@ -429,7 +429,7 @@
           return { ok: true, message: "Usando metadata local" };
         }
 
-        case "exportChecklistData": {
+case "exportChecklistData": {
           const { data: insumos, error: errInsumos } = await db.from("CHECKLIST_INSUMOS").select("*");
           const { data: areas, error: errAreas } = await db.from("CHECKLIST_AREA").select("*");
           if (errInsumos || errAreas) throw new Error("Error exportando información de checklist.");
@@ -441,6 +441,41 @@
           };
 
           return { ok: true, insumos: objToArray(insumos), area: objToArray(areas) };
+        }
+
+        // ==========================================
+        // 4. MÓDULO PEDIDOS ADICIONALES
+        // ==========================================
+        case "savePedidoAdicional": {
+          // Permite guardar un array de pedidos (por si Despacho envía varios)
+          const pedidos = Array.isArray(payload) ? payload : [payload];
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const nowStr = formatLocalNowApi();
+          
+          const insertData = pedidos.map((p, index) => {
+            const num = String(Date.now() + index).slice(-6);
+            return {
+              id_registro: `REQ-${num}`,
+              tipo_solicitud: p.tipo_solicitud,
+              fecha_registro: nowStr,
+              cliente: p.cliente || "INTERNO",
+              usuario_solicitante: user.nombre || user.email || "Usuario",
+              estado: "PENDIENTE",
+              comentario_general: p.comentario || "",
+              detalles: p.detalles || {},
+              ultima_actualizacion: nowStr
+            };
+          });
+
+          const { error } = await db.from("PEDIDOS_ADICIONALES").insert(insertData);
+          if (error) throw new Error(error.message);
+          return { ok: true, count: insertData.length };
+        }
+
+        case "listPedidosAdicionales": {
+          const { data, error } = await db.from("PEDIDOS_ADICIONALES").select("*").order("fecha_registro", { ascending: false });
+          if (error) throw new Error(error.message);
+          return { ok: true, rows: data || [] };
         }
 
         default:
