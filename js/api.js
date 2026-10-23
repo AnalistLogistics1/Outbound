@@ -482,18 +482,48 @@ case "listPedidosAdicionales": {
         // ==========================================
         // 5. APROBACIÓN DE PEDIDOS (NUEVO)
         // ==========================================
-        case "aprobarPedidosAdicionales": {
-          // Payload debe ser un array de IDs: ["REQ-123", "REQ-456"]
+case "aprobarPedidosAdicionales": {
           if (!Array.isArray(payload) || payload.length === 0) {
             throw new Error("Debe seleccionar al menos un registro para aprobar.");
           }
           
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const aprobador = user.nombre || user.email || "Usuario";
           const nowStr = formatLocalNowApi();
+          
           const { error } = await db
             .from("pedidos_adicionales")
             .update({ 
               estado: "APROBADO", 
-              ultima_actualizacion: nowStr 
+              ultima_actualizacion: nowStr,
+              fecha_aprobacion: nowStr,
+              aprobado_por: aprobador
+            })
+            .in("id_registro", payload);
+
+if (error) throw new Error(error.message);
+          return { ok: true, count: payload.length };
+        }
+
+        // ==========================================
+        // 6. RECHAZO DE PEDIDOS (NUEVO)
+        // ==========================================
+        case "rechazarPedidosAdicionales": {
+          if (!Array.isArray(payload) || payload.length === 0) {
+            throw new Error("Debe seleccionar al menos un registro para rechazar.");
+          }
+          
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const aprobador = user.nombre || user.email || "Usuario";
+          const nowStr = formatLocalNowApi();
+          
+          const { error } = await db
+            .from("pedidos_adicionales")
+            .update({ 
+              estado: "RECHAZADO", 
+              ultima_actualizacion: nowStr,
+              fecha_aprobacion: nowStr, // Usamos el mismo campo de auditoría
+              aprobado_por: aprobador
             })
             .in("id_registro", payload);
 

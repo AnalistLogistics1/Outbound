@@ -2,8 +2,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof window.requireAuth === "function") window.requireAuth();
 
   const token = typeof window.getToken === "function" ? window.getToken() : null;
-  const user = typeof window.getUser === "function" ? window.getUser() : JSON.parse(localStorage.getItem("authUser") || "{}");
-  const userRole = (user?.cargo || user?.rol || "USUARIO").toUpperCase();
+const user = typeof window.getUser === "function" ? window.getUser() : JSON.parse(localStorage.getItem("authUser") || "{}");
+  // CORRECCIÓN: Leer estrictamente el rol para evitar que el cargo bloquee los permisos
+  const userRole = (user?.rol || "USUARIO").toUpperCase();
   const puedeAprobar = userRole === "SUPERADMIN" || userRole === "APROBADOR";
 
   const btnRecepcionMain = document.getElementById("btnRecepcionMain");
@@ -24,10 +25,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const loaderDesc = document.getElementById("loaderDesc");
   const toast = document.getElementById("toast");
   
-  // Modal de Éxito
+// Modal de Éxito
   const successModal = document.getElementById("successModal");
   const successMessage = document.getElementById("successMessage");
   const btnCerrarSuccess = document.getElementById("btnCerrarSuccess");
+
+  // Modal de Confirmación
+  const confirmModal = document.getElementById("confirmModal");
+  const btnCancelarConfirm = document.getElementById("btnCancelarConfirm");
+  const btnAceptarConfirm = document.getElementById("btnAceptarConfirm");
 
   let pedidosDespachoTemp = []; 
 
@@ -97,10 +103,13 @@ document.addEventListener("DOMContentLoaded", () => {
     modal.setAttribute("aria-hidden", "true");
   }
 
-  if (btnRecepcionMain) btnRecepcionMain.addEventListener("click", () => {
+if (btnRecepcionMain) btnRecepcionMain.addEventListener("click", () => {
     modalRecepcion.querySelector("form").reset();
     
-    // Desbloquear campos por si se abrió un detalle previamente
+    // Ocultar caja de aprobación y habilitar campos
+    const infoBox = modalRecepcion.querySelector(".aprobacion-info");
+    if (infoBox) infoBox.style.display = "none";
+
     const inputs = modalRecepcion.querySelectorAll("input, textarea");
     inputs.forEach(inp => inp.disabled = false); 
     
@@ -110,10 +119,13 @@ document.addEventListener("DOMContentLoaded", () => {
   
   if (btnDespachoMain) btnDespachoMain.addEventListener("click", () => {
     pedidosDespachoTemp = [];
-    renderSubTablaDespacho();
+    renderSubTablaDespacho(); // Limpia la sub-tabla
     modalDespacho.querySelector("form").reset();
     
-    // Desbloquear campos
+    // Ocultar caja de aprobación y habilitar campos
+    const infoBox = modalDespacho.querySelector(".aprobacion-info");
+    if (infoBox) infoBox.style.display = "none";
+
     const inputs = modalDespacho.querySelectorAll("input, textarea, select");
     inputs.forEach(inp => inp.disabled = false); 
     
@@ -131,52 +143,79 @@ document.addEventListener("DOMContentLoaded", () => {
   const tbodyDespacho = modalDespacho?.querySelector("tbody");
   const inputCliente = modalDespacho?.querySelector("select");
 
-  if (btnAñadirPedido) {
-    btnAñadirPedido.addEventListener("click", () => {
-      const form = modalDespacho.querySelector("form");
-      const inputs = form.querySelectorAll("input, select, textarea");
-      const detalle = {};
-      inputs.forEach(inp => {
-        if(inp.previousElementSibling) detalle[inp.previousElementSibling.textContent.trim()] = inp.value;
-      });
+if (btnAñadirPedido) {
+    // Usamos (e) para prevenir recargas o dobles ejecuciones
+    btnAñadirPedido.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
 
-      if (!detalle["Cliente"] || detalle["Cliente"] === "Buscar Clientes") {
+      const cliente = document.getElementById("despCliente").value;
+      const pedido = document.getElementById("despPedido").value.trim();
+      const oc = document.getElementById("despOC").value;
+      const moneda = document.getElementById("despMoneda").value;
+      const valor = document.getElementById("despValor").value;
+      const fecha = document.getElementById("despFecha").value;
+      const tipo = document.getElementById("despTipo").value;
+      const comentarios = document.getElementById("despComentarios").value;
+
+      if (!cliente || cliente === "Buscar Clientes") {
         return showToast("Seleccione un cliente válido.", "warning");
+      }
+      
+      if (!pedido || pedido === "") {
+        return showToast("Ingrese el número de pedido.", "warning");
       }
 
       pedidosDespachoTemp.push({
         tipo_solicitud: "DESPACHO",
-        cliente: detalle["Cliente"],
-        comentario: detalle["Comentarios"],
-        detalles: detalle
+        cliente: cliente,
+        comentario: comentarios,
+        detalles: {
+          "Cliente": cliente,
+          "Pedido": pedido,
+          "OC": oc,
+          "Valor Venta": valor ? `${moneda} ${valor}` : "",
+          "Fecha despacho": fecha,
+          "Tipo": tipo,
+          "Comentarios": comentarios
+        }
       });
 
+      const inputCliente = document.getElementById("despCliente");
       if (inputCliente) inputCliente.disabled = true; 
       renderSubTablaDespacho();
       
-      inputs.forEach(inp => {
-        if(inp.tagName !== "SELECT" && inp.tagName !== "TEXTAREA") inp.value = "";
-      });
+      // Limpiar campos para el siguiente registro
+      document.getElementById("despPedido").value = "";
+      document.getElementById("despOC").value = "";
+      document.getElementById("despValor").value = "";
+      
       showToast("Pedido añadido a la bandeja.", "ok");
     });
   }
 
-  function renderSubTablaDespacho() {
+// Modificada para aceptar parámetro isReadOnly y ocultar la "X" en modo lectura
+  function renderSubTablaDespacho(isReadOnly = false) {
     if (!tbodyDespacho) return;
     if (pedidosDespachoTemp.length === 0) {
       tbodyDespacho.innerHTML = `<tr><td colspan="6" class="empty">No hay pedidos añadidos</td></tr>`;
       return;
     }
-    tbodyDespacho.innerHTML = pedidosDespachoTemp.map((p, i) => `
+    tbodyDespacho.innerHTML = pedidosDespachoTemp.map((p, i) => {
+      const accionHtml = isReadOnly 
+        ? `<td style="text-align:center; color:#64748b;">-</td>` 
+        : `<td style="color:red; cursor:pointer; text-align:center; font-weight:bold;" onclick="eliminarDespachoTemp(${i})">X</td>`;
+      
+      return `
       <tr>
-        <td>${p.detalles["Cliente"]}</td>
+        <td>${p.detalles["Cliente"] || "-"}</td>
         <td>${p.detalles["Pedido"] || "-"}</td>
         <td>${p.detalles["OC"] || "-"}</td>
         <td>${p.detalles["Valor Venta"] || "-"}</td>
         <td>${p.detalles["Fecha despacho"] || "-"}</td>
-        <td style="color:red; cursor:pointer; text-align:center; font-weight:bold;" onclick="eliminarDespachoTemp(${i})">X</td>
+        ${accionHtml}
       </tr>
-    `).join("");
+    `}).join("");
   }
 
   window.eliminarDespachoTemp = (index) => {
@@ -246,29 +285,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // --- ESTADO LOCAL PARA APROBACIÓN MASIVA ---
+// --- ESTADO LOCAL PARA ACCIONES MASIVAS ---
   let idsSeleccionados = new Set();
+  const contenedorAccionesMasivas = document.getElementById("contenedorAccionesMasivas");
   const btnAprobarSeleccionados = document.getElementById("btnAprobarSeleccionados");
+  const btnRechazarSeleccionados = document.getElementById("btnRechazarSeleccionados");
   const countSeleccionados = document.getElementById("countSeleccionados");
+  const countRechazados = document.getElementById("countRechazados");
 
-  function actualizarBotonAprobar() {
-    if (!btnAprobarSeleccionados || !countSeleccionados) return;
+  function actualizarBotonesAcciones() {
+    if (!contenedorAccionesMasivas) return;
     if (idsSeleccionados.size > 0) {
-      countSeleccionados.textContent = idsSeleccionados.size;
-      btnAprobarSeleccionados.style.display = "block";
+      if (countSeleccionados) countSeleccionados.textContent = idsSeleccionados.size;
+      if (countRechazados) countRechazados.textContent = idsSeleccionados.size;
+      contenedorAccionesMasivas.style.display = "flex";
     } else {
-      btnAprobarSeleccionados.style.display = "none";
+      contenedorAccionesMasivas.style.display = "none";
     }
   }
 
-  // Se expone al contexto global para que los checkboxes del HTML puedan llamarla
+// Se expone al contexto global para que los checkboxes del HTML puedan llamarla
   window.toggleCheckbox = (id, isChecked) => {
     if (isChecked) {
       idsSeleccionados.add(id);
     } else {
       idsSeleccionados.delete(id);
     }
-    actualizarBotonAprobar();
+    actualizarBotonesAcciones();
   };
 
   // --- CARGAR CLIENTES Y RENDERIZAR TRACKER ---
@@ -287,18 +330,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function cargarTracker() {
+async function cargarTracker() {
     if (!tablaTrackerRecepcion || !tablaTrackerDespacho) return;
     
     // Limpiar selecciones previas al recargar
     idsSeleccionados.clear();
-    actualizarBotonAprobar();
+    actualizarBotonesAcciones(); // <-- CORRECCIÓN AL NUEVO NOMBRE DE LA FUNCIÓN
 
     try {
       const res = await window.apiPost("listPedidosAdicionales", { token });
       
       if (!res.rows || res.rows.length === 0) {
-        tablaTrackerRecepcion.innerHTML = `<tr><td colspan="7" class="empty">No hay solicitudes registradas.</td></tr>`;
+        tablaTrackerRecepcion.innerHTML = `<tr><td colspan="6" class="empty">No hay solicitudes registradas.</td></tr>`;
         tablaTrackerDespacho.innerHTML = `<tr><td colspan="9" class="empty">No hay solicitudes registradas.</td></tr>`;
         return;
       }
@@ -308,7 +351,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // RENDERIZAR RECEPCIONES
       if (recepciones.length === 0) {
-        tablaTrackerRecepcion.innerHTML = `<tr><td colspan="7" class="empty">No hay recepciones registradas.</td></tr>`;
+        tablaTrackerRecepcion.innerHTML = `<tr><td colspan="6" class="empty">No hay recepciones registradas.</td></tr>`;
       } else {
         tablaTrackerRecepcion.innerHTML = recepciones.map(r => {
           let badgeColor = r.estado === "PENDIENTE" ? "background:#fef08a; color:#854d0e;" :
@@ -316,20 +359,19 @@ document.addEventListener("DOMContentLoaded", () => {
                            "background:#fecaca; color:#991b1b;";
                            
           let checkboxHtml = (puedeAprobar && r.estado === "PENDIENTE") 
-            ? `<input type="checkbox" onchange="toggleCheckbox('${r.id_registro}', this.checked)" style="width:18px; height:18px; cursor:pointer;">` : `-`;
+            ? `<input type="checkbox" onchange="toggleCheckbox('${r.id_registro}', this.checked)" style="width:18px; height:18px; cursor:pointer; vertical-align: middle;">` : ``;
 
           return `
             <tr>
               <td><strong>${r.id_registro}</strong></td>
-              <td>${r.fecha_registro.split(" ")[0]}</td>
+              <td>${r.fecha_registro}</td>
               <td>${r.usuario_solicitante}</td>
               <td><span class="badge" style="${badgeColor}">${r.estado}</span></td>
               <td>${r.comentario_general || ""}</td>
-              <td style="text-align:center;">
-                <!-- Icono de Ojo con Tooltip -->
-                <button class="btn-eye" onclick="verDetalle('${r.id_registro}')" title="Detalle" style="background:none; border:none; font-size:18px; cursor:pointer;">👁️</button>
+              <td style="text-align:center; white-space: nowrap;">
+                <button class="btn-eye" onclick="verDetalle('${r.id_registro}')" title="Detalle" style="background:none; border:none; font-size:18px; cursor:pointer; vertical-align: middle;">👁️</button>
+                <span style="margin-left: 8px; vertical-align: middle;">${checkboxHtml}</span>
               </td>
-              <td style="text-align:center;">${checkboxHtml}</td>
             </tr>
           `;
         }).join("");
@@ -350,7 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const pedido = (r.detalles && r.detalles["Pedido"]) ? r.detalles["Pedido"] : "-";
           const oc = (r.detalles && r.detalles["OC"]) ? r.detalles["OC"] : "-";
           const valor = (r.detalles && r.detalles["Valor Venta"]) ? r.detalles["Valor Venta"] : "-";
-          const fechaDespacho = (r.detalles && r.detalles["Fecha despacho"]) ? r.detalles["Fecha despacho"] : r.fecha_registro.split(" ")[0];
+          const fechaDespacho = r.fecha_registro;
 
           return `
             <tr>
@@ -362,10 +404,9 @@ document.addEventListener("DOMContentLoaded", () => {
               <td>${fechaDespacho}</td>
               <td>${r.usuario_solicitante}</td>
               <td><span class="badge" style="${badgeColor}">${r.estado}</span></td>
-              <td style="text-align:center;">
-                <!-- Icono de Ojo con Tooltip (Se usa ojo en lugar de hoja por estandarización) -->
+              <td style="text-align:center; white-space: nowrap;">
                 <button class="btn-eye" onclick="verDetalle('${r.id_registro}')" title="Detalle" style="background:none; border:none; font-size:18px; cursor:pointer; vertical-align: middle;">👁️</button>
-                <span style="margin-left: 10px;">${checkboxHtml}</span>
+                <span style="margin-left: 8px; vertical-align: middle;">${checkboxHtml}</span>
               </td>
             </tr>
           `;
@@ -374,12 +415,12 @@ document.addEventListener("DOMContentLoaded", () => {
       
       window.trackerData = res.rows;
     } catch (error) {
-      if (tablaTrackerRecepcion) tablaTrackerRecepcion.innerHTML = `<tr><td colspan="7" class="empty">Error al cargar datos.</td></tr>`;
+      if (tablaTrackerRecepcion) tablaTrackerRecepcion.innerHTML = `<tr><td colspan="6" class="empty">Error al cargar datos.</td></tr>`;
       if (tablaTrackerDespacho) tablaTrackerDespacho.innerHTML = `<tr><td colspan="9" class="empty">Error al cargar datos.</td></tr>`;
     }
   }
 
-  // --- EJECUCIÓN DEL BOTÓN APROBAR MASIVO ---
+// --- EJECUCIÓN DEL BOTÓN APROBAR MASIVO ---
   if (btnAprobarSeleccionados) {
     btnAprobarSeleccionados.addEventListener("click", async () => {
       const idsArray = Array.from(idsSeleccionados);
@@ -389,7 +430,7 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         await window.apiPost("aprobarPedidosAdicionales", idsArray);
         showSuccessModal("Registros aprobados correctamente.");
-        await cargarTracker(); // Refresca en tiempo real el tracker tras el éxito
+        await cargarTracker(); 
       } catch (error) {
         showToast("Error: " + error.message, "error");
       } finally {
@@ -398,6 +439,59 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+// --- EJECUCIÓN DEL BOTÓN RECHAZAR MASIVO ---
+  if (btnRechazarSeleccionados) {
+    btnRechazarSeleccionados.addEventListener("click", () => {
+      const idsArray = Array.from(idsSeleccionados);
+      if (idsArray.length === 0) return;
+
+      // Mostrar modal personalizado en lugar de la alerta del navegador
+      if (confirmModal) {
+        confirmModal.classList.add("is-open");
+        confirmModal.setAttribute("aria-hidden", "false");
+      }
+    });
+  }
+
+  // --- BOTONES DENTRO DEL MODAL DE CONFIRMACIÓN ---
+  if (btnCancelarConfirm) {
+    btnCancelarConfirm.addEventListener("click", () => {
+      if (confirmModal) {
+        confirmModal.classList.remove("is-open");
+        confirmModal.setAttribute("aria-hidden", "true");
+      }
+    });
+  }
+
+  if (btnAceptarConfirm) {
+    btnAceptarConfirm.addEventListener("click", async () => {
+      const idsArray = Array.from(idsSeleccionados);
+      if (idsArray.length === 0) return;
+
+      // Ocultar modal de confirmación antes de cargar
+      if (confirmModal) {
+        confirmModal.classList.remove("is-open");
+        confirmModal.setAttribute("aria-hidden", "true");
+      }
+
+      toggleLoader(true, "Rechazando Pedidos", "Actualizando base de datos...");
+      try {
+        await window.apiPost("rechazarPedidosAdicionales", idsArray);
+        showSuccessModal("Registros rechazados correctamente.");
+        await cargarTracker(); 
+      } catch (error) {
+        showToast("Error: " + error.message, "error");
+      } finally {
+        toggleLoader(false);
+      }
+    });
+  }
+
+  // Asegúrate de modificar también el cargarTracker() para que al final limpie las acciones
+  // (Busca dentro de cargarTracker donde dice "idsSeleccionados.clear();") y cámbialo a:
+  // idsSeleccionados.clear();
+  // actualizarBotonesAcciones();
+
   window.verDetalle = (id) => {
     const registro = window.trackerData.find(r => r.id_registro === id);
     if (!registro) return;
@@ -405,14 +499,67 @@ document.addEventListener("DOMContentLoaded", () => {
     const modal = registro.tipo_solicitud === "DESPACHO" ? modalDespacho : modalRecepcion;
     abrirModal(modal);
     
-    const inputs = modal.querySelectorAll("input, select, textarea");
-    inputs.forEach(inp => {
-      const label = inp.previousElementSibling ? inp.previousElementSibling.textContent.trim() : null;
-      if (label && registro.detalles) {
-        inp.value = registro.detalles[label] || "";
-        inp.disabled = true;
+    // Si es despacho, leemos por IDs para rellenar
+    if (registro.tipo_solicitud === "DESPACHO") {
+      document.getElementById("despCliente").value = registro.detalles["Cliente"] || "";
+      document.getElementById("despPedido").value = registro.detalles["Pedido"] || "";
+      document.getElementById("despOC").value = registro.detalles["OC"] || "";
+      
+      let valorCompleto = registro.detalles["Valor Venta"] || "";
+      if (valorCompleto.includes(" ")) {
+        let partes = valorCompleto.split(" ");
+        document.getElementById("despMoneda").value = partes[0];
+        document.getElementById("despValor").value = partes[1];
+      } else {
+        document.getElementById("despValor").value = valorCompleto;
       }
-    });
+      
+document.getElementById("despFecha").value = registro.detalles["Fecha despacho"] || "";
+      document.getElementById("despTipo").value = registro.detalles["Tipo"] || "";
+      document.getElementById("despComentarios").value = registro.detalles["Comentarios"] || "";
+      
+      // NUEVO: Llenar la sub-tabla inferior con el registro guardado en modo lectura
+      pedidosDespachoTemp = [{
+        detalles: registro.detalles
+      }];
+      renderSubTablaDespacho(true); 
+      
+    } else {
+      // Recepción sigue siendo genérico por labels
+      const inputs = modal.querySelectorAll("input, select, textarea");
+      inputs.forEach(inp => {
+        const label = inp.previousElementSibling ? inp.previousElementSibling.textContent.trim() : null;
+        if (label && registro.detalles) inp.value = registro.detalles[label] || "";
+      });
+    }
+
+    // Bloquear todos los inputs
+    modal.querySelectorAll("input, select, textarea").forEach(inp => inp.disabled = true);
+    
+// Mostrar u Ocultar Datos de Aprobación / Rechazo
+    const infoBox = modal.querySelector(".aprobacion-info");
+    if (registro.estado === "APROBADO" || registro.estado === "RECHAZADO") {
+      if (infoBox) {
+        infoBox.style.display = "block";
+        const isAprobado = registro.estado === "APROBADO";
+        
+        // Estilos dinámicos según estado (Verde / Rojo)
+        infoBox.style.background = isAprobado ? "#f0fdf4" : "#fef2f2";
+        infoBox.style.border = isAprobado ? "1px solid #bbf7d0" : "1px solid #fecaca";
+        const textColor = isAprobado ? "#166534" : "#991b1b";
+        infoBox.querySelectorAll("p").forEach(p => p.style.color = textColor);
+
+        // Textos dinámicos según estado
+        infoBox.querySelector(".lbl-titulo-fecha").textContent = isAprobado ? "Fecha Aprobación:" : "Fecha Rechazo:";
+        infoBox.querySelector(".lbl-titulo-usuario").textContent = isAprobado ? "Aprobado por:" : "Rechazado por:";
+        
+        // Valores extraídos de la BD
+        infoBox.querySelector(".lbl-fecha-accion").textContent = registro.fecha_aprobacion || "-";
+        infoBox.querySelector(".lbl-usuario-accion").textContent = registro.aprobado_por || "-";
+      }
+    } else {
+      if (infoBox) infoBox.style.display = "none";
+    }
     
     modal.querySelector(".btn-primary").style.display = "none";
     if (modal.querySelector(".btn-soft")) modal.querySelector(".btn-soft").style.display = "none";

@@ -32,38 +32,42 @@
     </section>
 
 <!-- Controles Superiores de Tablas -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px; margin-bottom: -15px; position: relative; z-index: 2;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 10px;">
       <!-- Tabs / Sub-botones -->
       <div class="tracker-tabs" style="display: flex; gap: 10px;">
         <button id="tabRecepcion" class="btn-tab active">Tracker Recepción</button>
         <button id="tabDespacho" class="btn-tab">Tracker Despachos</button>
       </div>
 
-      <!-- Botón de Aprobación Masiva (Oculto por defecto) -->
-      <button id="btnAprobarSeleccionados" class="btn btn-primary" style="display: none; height: 38px; padding: 0 20px; box-shadow: 0 -4px 10px rgba(15, 23, 42, 0.05); border-radius: 12px 12px 0 0;">
-        Aprobar Seleccionados (<span id="countSeleccionados">0</span>)
-      </button>
+      <!-- Controles de Acción Masiva (Ocultos por defecto) -->
+      <div id="contenedorAccionesMasivas" style="display: none; gap: 8px;">
+        <button id="btnRechazarSeleccionados" class="btn" style="height: 38px; padding: 0 16px; background: #fee2e2; color: #991b1b; border-radius: 8px; font-size: 13px; font-weight: bold; border: 1px solid #fca5a5;">
+          Rechazar (<span id="countRechazados">0</span>)
+        </button>
+        <button id="btnAprobarSeleccionados" class="btn btn-primary" style="height: 38px; padding: 0 16px; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.1); border-radius: 8px; font-size: 13px;">
+          Aprobar (<span id="countSeleccionados">0</span>)
+        </button>
+      </div>
     </div>
 
     <!-- Tracker de Registros Separados -->
-    <section class="table-card" style="margin-top: 15px;">
+    <section class="table-card" style="margin-top: 0;">
       
       <!-- Vista Recepción -->
       <div id="viewRecepcion" class="table-wrap">
         <table>
-          <thead style="background: #f8fafc;">
+<thead style="background: #f8fafc;">
             <tr>
               <th>ID</th>
-              <th>Fecha</th>
+              <th>Fecha Registro</th>
               <th>Solicitante</th>
               <th>Estado</th>
               <th>Comentario</th>
-              <th style="text-align:center;">Detalle</th>
               <th style="text-align:center;">Acción</th>
             </tr>
           </thead>
           <tbody id="tablaTrackerRecepcion">
-            <tr><td colspan="7" class="empty">Cargando registros...</td></tr>
+            <tr><td colspan="6" class="empty">Cargando registros...</td></tr>
           </tbody>
         </table>
       </div>
@@ -78,7 +82,7 @@
               <th>Pedido</th>
               <th>OC</th>
               <th>Valor</th>
-              <th>Fecha</th>
+              <th>Fecha Registro</th>
               <th>Solicitante</th>
               <th>Estado</th>
               <th style="text-align:center;">Acción</th>
@@ -112,6 +116,13 @@
           
           <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios"></textarea></div>
         </div>
+
+<!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
+        <div class="aprobacion-info" style="display: none; margin-top: 16px; padding: 12px; border-radius: 12px; transition: all 0.3s;">
+           <p style="margin: 0; font-size: 13px;"><strong class="lbl-titulo-fecha">Fecha:</strong> <span class="lbl-fecha-accion">-</span></p>
+           <p style="margin: 4px 0 0 0; font-size: 13px;"><strong class="lbl-titulo-usuario">Usuario:</strong> <span class="lbl-usuario-accion">-</span></p>
+        </div>
+
         <div class="modal-actions">
           <button type="button" class="btn btn-primary">Solicitar Aprobación</button>
         </div>
@@ -127,28 +138,36 @@
         <button type="button" class="modal-close" id="cerrarDespacho">x</button>
       </div>
       <form class="modal-body">
-        <div class="dynamic-grid grid-3">
+<div class="dynamic-grid grid-3">
           <div class="field">
             <label>Cliente</label>
-            <select><option>Buscar Clientes</option></select>
+            <select id="despCliente"><option>Buscar Clientes</option></select>
           </div>
-          <div class="field"><label>Pedido</label><input type="text" placeholder="Ingrese número de pedido"></div>
-          <div class="field"><label>OC</label><input type="text" placeholder="Ingrese número de OC"></div>
+          <div class="field"><label>Pedido</label><input type="text" id="despPedido" placeholder="Ingrese número de pedido"></div>
+          <div class="field"><label>OC</label><input type="text" id="despOC" placeholder="Ingrese número de OC"></div>
           
-          <div class="field"><label>Valor Venta</label><input type="text" placeholder="$,00"></div>
-          <div class="field"><label>Fecha despacho</label><input type="date"></div>
+          <div class="field">
+            <label>Valor Venta</label>
+            <div style="display: flex; gap: 8px;">
+              <select id="despMoneda" style="width: 70px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 14px; outline: none; background: #ffffff;">
+                <option value="S/">S/</option>
+                <option value="$">$</option>
+              </select>
+              <input type="number" id="despValor" placeholder="0.00" style="flex: 1;">
+            </div>
+          </div>
+          <div class="field"><label>Fecha despacho</label><input type="date" id="despFecha"></div>
           <div class="field">
             <label>Tipo</label>
-            <select>
+            <select id="despTipo">
               <option>Despacho 24 H</option>
               <option>Urgencia</option>
             </select>
           </div>
-          
-          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios"></textarea></div>
+          <div class="field field-full"><label>Comentarios</label><textarea id="despComentarios" rows="2" placeholder="Ingrese comentarios"></textarea></div>
         </div>
 
-        <!-- Sub-Grilla de Despacho -->
+<!-- Sub-Grilla de Despacho -->
         <div class="table-wrap" style="border: 1px solid var(--border); border-radius: 12px; margin-top: 14px; min-height: 120px;">
           <table>
             <thead style="background: #d4d4d4;">
@@ -158,6 +177,12 @@
               <tr><td colspan="6" class="empty">No hay pedidos añadidos</td></tr>
             </tbody>
           </table>
+        </div>
+
+<!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
+        <div class="aprobacion-info" style="display: none; margin-top: 16px; padding: 12px; border-radius: 12px; transition: all 0.3s;">
+           <p style="margin: 0; font-size: 13px;"><strong class="lbl-titulo-fecha">Fecha:</strong> <span class="lbl-fecha-accion">-</span></p>
+           <p style="margin: 4px 0 0 0; font-size: 13px;"><strong class="lbl-titulo-usuario">Usuario:</strong> <span class="lbl-usuario-accion">-</span></p>
         </div>
 
         <div class="modal-actions" style="margin-top: 14px;">
@@ -179,7 +204,7 @@
     </div>
   </div>
 
-  <!-- Success Modal (Ventana emergente de éxito) -->
+<!-- Success Modal (Ventana emergente de éxito) -->
   <div class="custom-loader-backdrop" id="successModal" aria-hidden="true" style="z-index: 100001;">
     <div class="custom-loader-card" style="padding-bottom: 24px;">
       <div style="width: 80px; height: 80px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
@@ -191,7 +216,20 @@
     </div>
   </div>
 
-  <!-- Toast (Alertas Profesionales) -->
+  <!-- Confirm Modal (Ventana emergente de confirmación de rechazo) -->
+  <div class="custom-loader-backdrop" id="confirmModal" aria-hidden="true" style="z-index: 100001;">
+    <div class="custom-loader-card" style="padding-bottom: 24px; min-width: 320px;">
+      <div style="width: 80px; height: 80px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+        <img src="./img/logo.png" alt="SLS Logo" style="width: 50px; border-radius: 50%; background: #000;">
+      </div>
+      <h3 style="color: #991b1b; font-size: 22px;">Confirmar Rechazo</h3>
+      <p style="margin-bottom: 20px; color: #475569; font-size: 14px;">¿Está seguro de rechazar los pedidos seleccionados?</p>
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <button id="btnCancelarConfirm" class="btn" style="flex: 1; background: #f1f5f9; color: #475569; box-shadow: none;">Cancelar</button>
+        <button id="btnAceptarConfirm" class="btn" style="flex: 1; background: #991b1b; color: #ffffff; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">Rechazar</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast (Alertas Profesionales) -->
   <div id="toast" class="toast"></div>
