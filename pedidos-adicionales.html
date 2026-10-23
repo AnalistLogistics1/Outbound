@@ -153,6 +153,7 @@
         <div class="aprobacion-info" style="display: none; margin-top: 16px; padding: 12px; border-radius: 12px; transition: all 0.3s;">
            <p style="margin: 0; font-size: 13px;"><strong class="lbl-titulo-fecha">Fecha:</strong> <span class="lbl-fecha-accion">-</span></p>
            <p style="margin: 4px 0 0 0; font-size: 13px;"><strong class="lbl-titulo-usuario">Usuario:</strong> <span class="lbl-usuario-accion">-</span></p>
+           <p class="fila-comentario-rechazo" style="margin: 4px 0 0 0; font-size: 13px; display: none;"><strong>Motivo:</strong> <span class="lbl-comentario-accion">-</span></p>
         </div>
 
         <div class="modal-actions">
@@ -217,6 +218,7 @@
         <div class="aprobacion-info" style="display: none; margin-top: 16px; padding: 12px; border-radius: 12px; transition: all 0.3s;">
            <p style="margin: 0; font-size: 13px;"><strong class="lbl-titulo-fecha">Fecha:</strong> <span class="lbl-fecha-accion">-</span></p>
            <p style="margin: 4px 0 0 0; font-size: 13px;"><strong class="lbl-titulo-usuario">Usuario:</strong> <span class="lbl-usuario-accion">-</span></p>
+           <p class="fila-comentario-rechazo" style="margin: 4px 0 0 0; font-size: 13px; display: none;"><strong>Motivo:</strong> <span class="lbl-comentario-accion">-</span></p>
         </div>
 
         <div class="modal-actions" style="margin-top: 14px;">
@@ -250,14 +252,21 @@
     </div>
   </div>
 
-  <!-- Confirm Modal (Ventana emergente de confirmación de rechazo) -->
+<!-- Confirm Modal (Ventana emergente de confirmación de rechazo) -->
   <div class="custom-loader-backdrop" id="confirmModal" aria-hidden="true" style="z-index: 100001;">
     <div class="custom-loader-card" style="padding-bottom: 24px; min-width: 320px;">
       <div style="width: 80px; height: 80px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
         <img src="./img/logo.png" alt="SLS Logo" style="width: 50px; border-radius: 50%; background: #000;">
       </div>
       <h3 style="color: #991b1b; font-size: 22px;">Confirmar Rechazo</h3>
-      <p style="margin-bottom: 20px; color: #475569; font-size: 14px;">¿Está seguro de rechazar los pedidos seleccionados?</p>
+      <p style="margin-bottom: 10px; color: #475569; font-size: 14px;">¿Está seguro de rechazar los pedidos seleccionados?</p>
+      
+      <!-- Nuevo campo para comentario -->
+      <div style="width: 100%; text-align: left; margin-bottom: 20px;">
+        <label style="font-size: 12px; font-weight: bold; color: #475569;">Comentario de cancelación</label>
+        <textarea id="txtComentarioRechazo" rows="3" placeholder="Ingrese el motivo (Mínimo 5, Máximo 100 caracteres)" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: inherit; font-size: 13px; resize: none; margin-top: 5px; box-sizing: border-box;"></textarea>
+      </div>
+
       <div style="display: flex; gap: 10px; width: 100%;">
         <button id="btnCancelarConfirm" class="btn" style="flex: 1; background: #f1f5f9; color: #475569; box-shadow: none;">Cancelar</button>
         <button id="btnAceptarConfirm" class="btn" style="flex: 1; background: #991b1b; color: #ffffff; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">Rechazar</button>

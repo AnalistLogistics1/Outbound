@@ -505,11 +505,14 @@ if (error) throw new Error(error.message);
           return { ok: true, count: payload.length };
         }
 
-        // ==========================================
+// ==========================================
         // 6. RECHAZO DE PEDIDOS (NUEVO)
         // ==========================================
         case "rechazarPedidosAdicionales": {
-          if (!Array.isArray(payload) || payload.length === 0) {
+          const idsToReject = payload.ids || payload;
+          const comentarioRechazo = payload.comentario || "";
+
+          if (!Array.isArray(idsToReject) || idsToReject.length === 0) {
             throw new Error("Debe seleccionar al menos un registro para rechazar.");
           }
           
@@ -522,13 +525,14 @@ if (error) throw new Error(error.message);
             .update({ 
               estado: "RECHAZADO", 
               ultima_actualizacion: nowStr,
-              fecha_aprobacion: nowStr, // Usamos el mismo campo de auditoría
-              aprobado_por: aprobador
+              fecha_aprobacion: nowStr, 
+              aprobado_por: aprobador,
+              comentario_rechazo: comentarioRechazo
             })
-            .in("id_registro", payload);
+            .in("id_registro", idsToReject);
 
           if (error) throw new Error(error.message);
-          return { ok: true, count: payload.length };
+          return { ok: true, count: idsToReject.length };
         }
 
         default:

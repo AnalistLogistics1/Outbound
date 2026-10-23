@@ -503,6 +503,8 @@ function actualizarContadores() {
       const idsArray = Array.from(idsSeleccionados);
       if (idsArray.length === 0) return;
       if (confirmModal) {
+        const txtComentario = document.getElementById("txtComentarioRechazo");
+        if (txtComentario) txtComentario.value = ""; // Limpiar campo al abrir
         confirmModal.classList.add("is-open");
         confirmModal.setAttribute("aria-hidden", "false");
       }
@@ -522,13 +524,22 @@ function actualizarContadores() {
     btnAceptarConfirm.addEventListener("click", async () => {
       const idsArray = Array.from(idsSeleccionados);
       if (idsArray.length === 0) return;
+
+      const txtComentario = document.getElementById("txtComentarioRechazo");
+      const comentario = txtComentario ? txtComentario.value.trim() : "";
+      
+      // Validación estricta
+      if (comentario.length < 5 || comentario.length > 100) {
+        return showToast("El comentario de cancelación debe tener entre 5 y 100 caracteres.", "warning");
+      }
+
       if (confirmModal) {
         confirmModal.classList.remove("is-open");
         confirmModal.setAttribute("aria-hidden", "true");
       }
       toggleLoader(true, "Rechazando Pedidos", "Actualizando base de datos...");
       try {
-        await window.apiPost("rechazarPedidosAdicionales", idsArray);
+        await window.apiPost("rechazarPedidosAdicionales", { ids: idsArray, comentario: comentario });
         showSuccessModal("Registros rechazados correctamente.");
         await cargarTracker(); 
       } catch (error) { showToast("Error: " + error.message, "error"); } finally { toggleLoader(false); }
@@ -571,7 +582,7 @@ function actualizarContadores() {
 
     modal.querySelectorAll("input, select, textarea").forEach(inp => inp.disabled = true);
     
-    // Colores e información de auditoría para Aprobado/Rechazado
+// Colores e información de auditoría para Aprobado/Rechazado
     const infoBox = modal.querySelector(".aprobacion-info");
     if (registro.estado === "APROBADO" || registro.estado === "RECHAZADO") {
       if (infoBox) {
@@ -581,10 +592,20 @@ function actualizarContadores() {
         infoBox.style.border = isAprobado ? "1px solid #bbf7d0" : "1px solid #fecaca";
         const textColor = isAprobado ? "#166534" : "#991b1b";
         infoBox.querySelectorAll("p").forEach(p => p.style.color = textColor);
+        
         infoBox.querySelector(".lbl-titulo-fecha").textContent = isAprobado ? "Fecha Aprobación:" : "Fecha Rechazo:";
         infoBox.querySelector(".lbl-titulo-usuario").textContent = isAprobado ? "Aprobado por:" : "Rechazado por:";
         infoBox.querySelector(".lbl-fecha-accion").textContent = registro.fecha_aprobacion || "-";
         infoBox.querySelector(".lbl-usuario-accion").textContent = registro.aprobado_por || "-";
+
+        // Mostrar comentario solo si fue rechazado
+        const filaMotivo = infoBox.querySelector(".fila-comentario-rechazo");
+        if (!isAprobado && filaMotivo) {
+          filaMotivo.style.display = "block";
+          infoBox.querySelector(".lbl-comentario-accion").textContent = registro.comentario_rechazo || "Sin comentario";
+        } else if (filaMotivo) {
+          filaMotivo.style.display = "none";
+        }
       }
     } else {
       if (infoBox) infoBox.style.display = "none";
