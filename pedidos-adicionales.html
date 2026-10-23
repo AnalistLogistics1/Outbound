@@ -146,7 +146,7 @@
           <div class="field"><label>Fecha</label><input type="date"></div>
           <div class="field"><label>Hora de llegada 12H</label><input type="time" placeholder="Ejemplo: 03:00 PM"></div>
           
-          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios"></textarea></div>
+          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios (Mínimo 5 caracteres)" minlength="5" maxlength="150"></textarea></div>
         </div>
 
 <!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
@@ -175,7 +175,8 @@
             <label>Cliente</label>
             <select id="despCliente"><option>Buscar Clientes</option></select>
           </div>
-          <div class="field"><label>Pedido</label><input type="text" id="despPedido" placeholder="Ingrese número de pedido"></div>
+<!-- Se restringe Pedido a 6 numéricos -->
+          <div class="field"><label>Pedido</label><input type="text" id="despPedido" placeholder="6 dígitos (Ej: 123456)" maxlength="6" pattern="[0-9]{6}"></div>
           <div class="field"><label>OC</label><input type="text" id="despOC" placeholder="Ingrese número de OC"></div>
           
           <div class="field">
@@ -192,11 +193,12 @@
           <div class="field">
             <label>Tipo</label>
             <select id="despTipo">
-              <option>Despacho 24 H</option>
-              <option>Urgencia</option>
+              <option value="" selected disabled>Seleccione Tipo</option>
+              <option value="Despacho 24 H">Despacho 24 H</option>
+              <option value="Urgencia">Urgencia</option>
             </select>
           </div>
-          <div class="field field-full"><label>Comentarios</label><textarea id="despComentarios" rows="2" placeholder="Ingrese comentarios"></textarea></div>
+          <div class="field field-full"><label>Comentarios</label><textarea id="despComentarios" rows="2" placeholder="Ingrese comentarios (Mínimo 5 caracteres)" minlength="5" maxlength="150"></textarea></div>
         </div>
 
 <!-- Sub-Grilla de Despacho -->

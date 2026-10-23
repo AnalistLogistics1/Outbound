@@ -198,8 +198,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const tipo = document.getElementById("despTipo").value;
       const comentarios = document.getElementById("despComentarios").value;
 
-      if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un cliente válido.", "warning");
-      if (!pedido || pedido === "") return showToast("Ingrese el número de pedido.", "warning");
+if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un cliente válido.", "warning");
+      
+      // Validación estricta de 6 caracteres numéricos
+      const esNumero6Digitos = /^\d{6}$/.test(pedido);
+      if (!esNumero6Digitos) {
+        return showToast("El campo Pedido debe contener exactamente 6 números.", "warning");
+      }
+
+      if (!tipo || tipo === "") return showToast("Seleccione un tipo de despacho.", "warning");
+
+      if (comentarios.length < 5 || comentarios.length > 150) {
+        return showToast("El comentario debe tener entre 5 y 150 caracteres.", "warning");
+      }
 
       pedidosDespachoTemp.push({
         tipo_solicitud: "DESPACHO",
@@ -271,13 +282,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const btnSolicitarRecepcion = modalRecepcion?.querySelector(".btn-primary");
-  if (btnSolicitarRecepcion) {
+if (btnSolicitarRecepcion) {
     btnSolicitarRecepcion.addEventListener("click", async () => {
       const inputs = modalRecepcion.querySelectorAll("input, textarea");
       const detalle = {};
       inputs.forEach(inp => {
         if(inp.previousElementSibling) detalle[inp.previousElementSibling.textContent.trim()] = inp.value;
       });
+
+      const comentariosRec = detalle["Comentarios"] || "";
+      if (comentariosRec.length < 5 || comentariosRec.length > 150) {
+        return showToast("El comentario debe tener entre 5 y 150 caracteres.", "warning");
+      }
+
       toggleLoader(true, "Registrando Recepción", "Guardando solicitud en base de datos...");
       try {
         await window.apiPost("savePedidoAdicional", {
@@ -294,10 +311,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- ACTUALIZAR CONTADORES ---
-  function actualizarContadores() {
+function actualizarContadores() {
     if (!window.trackerData) return;
     
-    // Filtrar los datos según la pestaña activa (Recepción o Despacho)
     const tipoFiltro = tabActivo === "RECEPCION" ? "RECEPCIÓN" : "DESPACHO";
     const dataTab = window.trackerData.filter(r => r.tipo_solicitud === tipoFiltro);
     
@@ -306,10 +322,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const countAprobados = dataTab.filter(r => r.estado === "APROBADO").length;
     const countRechazados = dataTab.filter(r => r.estado === "RECHAZADO").length;
 
+    // Actualiza textos
     if (document.getElementById("countTodos")) document.getElementById("countTodos").textContent = countTotal;
     if (document.getElementById("countPendientes")) document.getElementById("countPendientes").textContent = countPendientes;
     if (document.getElementById("countAprobados")) document.getElementById("countAprobados").textContent = countAprobados;
     if (document.getElementById("countRechazadosGlobal")) document.getElementById("countRechazadosGlobal").textContent = countRechazados;
+
+    // Ocultar dinámicamente si están en 0
+    const btnTodos = document.querySelector('.btn-estado[data-estado="TODOS"]');
+    const btnPendiente = document.querySelector('.btn-estado[data-estado="PENDIENTE"]');
+    const btnAprobado = document.querySelector('.btn-estado[data-estado="APROBADO"]');
+    const btnRechazado = document.querySelector('.btn-estado[data-estado="RECHAZADO"]');
+
+    if (btnTodos) btnTodos.style.display = countTotal > 0 ? "flex" : "none";
+    if (btnPendiente) btnPendiente.style.display = countPendientes > 0 ? "flex" : "none";
+    if (btnAprobado) btnAprobado.style.display = countAprobados > 0 ? "flex" : "none";
+    if (btnRechazado) btnRechazado.style.display = countRechazados > 0 ? "flex" : "none";
   }
 
   // --- CARGAR Y RENDERIZAR TRACKER (CON FILTROS Y OCULTAMIENTO) ---
@@ -572,7 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (meta.clientes && meta.clientes.length > 0) {
         const inputCliente = modalDespacho?.querySelector("select");
         if(inputCliente) {
-          inputCliente.innerHTML = `<option value="">Buscar Clientes</option>` + 
+          inputCliente.innerHTML = `<option value="">Seleccione Cliente</option>` + 
             meta.clientes.map(c => `<option value="${c}">${c}</option>`).join("");
         }
       }
