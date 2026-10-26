@@ -277,8 +277,17 @@
   <!-- Toast (Alertas Profesionales) -->
   <div id="toast" class="toast"></div>
 
-  <!-- LIBRERÍA DE SUPABASE (Soluciona el error de carga) -->
+<!-- LIBRERÍA DE SUPABASE -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- LIBRERÍA EMAILJS -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script type="text/javascript">
+    (function() {
+      // Inicialización con tu Public Key de EmailJS
+      emailjs.init("vSCpoY7z1z3btJ8pM"); 
+    })();
+  </script>
 
   <script src="./js/api.js"></script>
   <script src="./js/auth.js"></script>

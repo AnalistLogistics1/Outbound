@@ -132,6 +132,114 @@
     }
     return 'LOT-' + String(nextNum).padStart(6, '0');
   }
+// ==========================================
+  // MOTOR DE CORREOS Y NOTIFICACIONES (EMAILJS)
+  // ==========================================
+  
+  async function obtenerCorreosNotificacion(db, emailSolicitante) {
+    let correosDestino = [];
+    
+    // Correo del solicitante (si existe)
+    if (emailSolicitante) {
+      const { data: sol } = await db.from("PLANILLA").select("correo").eq("email", emailSolicitante).maybeSingle();
+      if (sol && sol.correo) correosDestino.push(sol.correo);
+    }
+    
+    // Correos de todos los Aprobadores y Superadmin
+    const { data: aprobadores } = await db.from("PLANILLA").select("correo").in("rol", ["APROBADOR", "SUPERADMIN"]);
+    if (aprobadores) {
+      aprobadores.forEach(a => {
+        if (a.correo && !correosDestino.includes(a.correo)) correosDestino.push(a.correo);
+      });
+    }
+    
+    // Retorna una lista separada por comas, requerida por EmailJS
+    return correosDestino.join(", ");
+  }
+
+function generarHtmlCorreo(titulo, colorCabecera, mensajeIntro, detalles, mensajeFooter) {
+    // Reducimos el padding de 12px a 7px para hacer la tabla más tabulada e igual a la imagen de referencia
+    const filasTabla = Object.entries(detalles).map(([llave, valor]) => `
+      <tr>
+        <td width="35%" valign="middle" style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; color: #334155; font-size: 13px;">${llave}</td>
+        <td width="65%" valign="middle" style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0; color: #475569; font-size: 13px;">${valor}</td>
+      </tr>
+    `).join("");
+
+    return `
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="font-family: Arial, Helvetica, sans-serif; background-color: #f1f5f9; padding: 20px 10px;">
+        <tr>
+          <td align="center">
+            <table width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1; border-collapse: separate; overflow: hidden;">
+              <!-- Cabecera -->
+              <tr>
+                <td style="background-color: ${colorCabecera}; padding: 16px; text-align: center;">
+                  <h2 style="color: #ffffff; margin: 0; font-size: 18px; font-weight: bold;">${titulo}</h2>
+                </td>
+              </tr>
+              <!-- Cuerpo -->
+              <tr>
+                <td style="padding: 24px;">
+                  <p style="color: #334155; font-weight: bold; margin: 0 0 10px 0; font-size: 14px;">Estimado(a),</p>
+                  <p style="color: #475569; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">${mensajeIntro}</p>
+                  
+                  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin-bottom: 20px; border-top: 1px solid #e2e8f0;">
+                    <tbody>
+                      ${filasTabla}
+                    </tbody>
+                  </table>
+                  
+                  <div style="border-left: 4px solid ${colorCabecera}; padding-left: 12px; margin-bottom: 16px;">
+                    <p style="color: #475569; margin: 0; font-size: 12px;">${mensajeFooter}</p>
+                  </div>
+                  
+                  <p style="color: #475569; margin: 0; font-size: 13px;">Muchas gracias / Saludos.</p>
+                </td>
+              </tr>
+              <!-- Footer -->
+              <tr>
+                <td style="background-color: #f8fafc; padding: 12px; text-align: center; border-top: 1px solid #e2e8f0;">
+                  <p style="color: #94a3b8; font-size: 10px; margin: 0;">Notificación automática enviada desde el Sistema Logístico.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `;
+  }
+
+async function enviarAlertaCorreo(destinatarios, asunto, html) {
+    if (!window.emailjs) {
+      console.warn("EmailJS no está cargado.");
+      return;
+    }
+
+    if (!destinatarios || String(destinatarios).trim() === "") {
+      console.warn("No hay destinatarios de correo.");
+      return;
+    }
+
+    const SERVICE_ID = "service_o76dodr";
+    const TEMPLATE_ID = "template_89p9pmu";
+
+    const templateParams = {
+      to_email: destinatarios,
+      subject: asunto,
+      message_html: html
+    };
+
+    try {
+      // EmailJS lee la Public Key directamente desde la inicialización en el HTML
+      const response = await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
+      console.log("Correo enviado exitosamente:", response.status, response.text);
+    } catch (error) {
+      console.error("Error enviando correo con EmailJS:", error);
+      const detalle = error?.text || error?.message || "Error desconocido";
+      console.error("Detalle EmailJS:", detalle);
+    }
+  }
+
 
   async function apiPost(action, payload = {}) {
     const db = getSupabaseClient();
@@ -425,11 +533,10 @@
         }
 
         case "getChecklistMeta": {
-          // CORRECCIÓN: Devolvemos ok: true para evitar el error en consola y que cargue normal.
           return { ok: true, message: "Usando metadata local" };
         }
 
-case "exportChecklistData": {
+        case "exportChecklistData": {
           const { data: insumos, error: errInsumos } = await db.from("CHECKLIST_INSUMOS").select("*");
           const { data: areas, error: errAreas } = await db.from("CHECKLIST_AREA").select("*");
           if (errInsumos || errAreas) throw new Error("Error exportando información de checklist.");
@@ -447,7 +554,6 @@ case "exportChecklistData": {
         // 4. MÓDULO PEDIDOS ADICIONALES
         // ==========================================
         case "savePedidoAdicional": {
-          // Permite guardar un array de pedidos (por si Despacho envía varios)
           const pedidos = Array.isArray(payload) ? payload : [payload];
           const user = JSON.parse(localStorage.getItem("authUser") || "{}");
           const nowStr = formatLocalNowApi();
@@ -467,13 +573,44 @@ case "exportChecklistData": {
             };
           });
 
-// CORRECCIÓN: Nombre de tabla en minúsculas coincidiendo con Supabase
           const { error } = await db.from("pedidos_adicionales").insert(insertData);
           if (error) throw new Error(error.message);
+
+// ENVIAR ALERTA DE CREACIÓN (AMARILLO)
+          const correos = await obtenerCorreosNotificacion(db, user.email || user.usuario);
+          
+          if (correos.length > 0) {
+            for (const p of insertData) {
+              const detallesHtml = {
+                "ID Registro": p.id_registro,
+                "Tipo Solicitud": p.tipo_solicitud,
+              };
+
+              // Validamos dinámicamente si es Recepción o Despacho
+              if (p.tipo_solicitud === "RECEPCIÓN") {
+                detallesHtml["COSTO"] = p.detalles["Costos"] || "-";
+              } else {
+                detallesHtml["Cliente / Destino"] = p.cliente;
+              }
+
+              detallesHtml["Responsable"] = p.usuario_solicitante;
+              detallesHtml["Fecha"] = p.fecha_registro;
+
+                const html = generarHtmlCorreo(
+                "Solicitud Pendiente", // Se actualizó el título
+                "#eab308", 
+                "El equipo está trabajando en su solicitud activamente. A continuación, los detalles de la solicitud:", 
+                detallesHtml, 
+                "El solicitud se encuentra en estado PENDIENTE de aprobación."
+              );
+              await enviarAlertaCorreo(correos, `Nueva Solicitud Creada [${p.id_registro}]`, html);
+            }
+          }
+
           return { ok: true, count: insertData.length };
         }
 
-case "listPedidosAdicionales": {
+        case "listPedidosAdicionales": {
           const { data, error } = await db.from("pedidos_adicionales").select("*").order("fecha_registro", { ascending: false });
           if (error) throw new Error(error.message);
           return { ok: true, rows: data || [] };
@@ -482,7 +619,7 @@ case "listPedidosAdicionales": {
         // ==========================================
         // 5. APROBACIÓN DE PEDIDOS (NUEVO)
         // ==========================================
-case "aprobarPedidosAdicionales": {
+        case "aprobarPedidosAdicionales": {
           if (!Array.isArray(payload) || payload.length === 0) {
             throw new Error("Debe seleccionar al menos un registro para aprobar.");
           }
@@ -501,11 +638,36 @@ case "aprobarPedidosAdicionales": {
             })
             .in("id_registro", payload);
 
-if (error) throw new Error(error.message);
+          if (error) throw new Error(error.message);
+
+// ENVIAR ALERTA DE APROBACIÓN (VERDE)
+          const { data: pedidosAprobados } = await db.from("pedidos_adicionales").select("*").in("id_registro", payload);
+          if (pedidosAprobados) {
+            for (const p of pedidosAprobados) {
+              const correos = await obtenerCorreosNotificacion(db, p.usuario_solicitante);
+              const detallesHtml = {
+                "ID Registro": p.id_registro,
+                "Tipo Solicitud": p.tipo_solicitud, // Se agregó el tipo de solicitud
+                "Estatus": "Aprobado",
+                "Aprobado por": aprobador,
+                "Fecha Aprobación": nowStr
+              };
+              const html = generarHtmlCorreo(
+                "Solicitud Aprobada", 
+                "#22c55e", 
+                `Nos complace informarle que su solicitud <b>${p.id_registro}</b> ha sido <b>aprobado exitosamente</b>.`, 
+                detallesHtml, 
+                "La solicitud ha sido aprobado en el sistema."
+              );
+              // Se actualizó el asunto del correo
+              await enviarAlertaCorreo(correos, `Solicitud Aprobada [${p.id_registro}]`, html);
+            }
+          }
+
           return { ok: true, count: payload.length };
         }
 
-// ==========================================
+        // ==========================================
         // 6. RECHAZO DE PEDIDOS (NUEVO)
         // ==========================================
         case "rechazarPedidosAdicionales": {
@@ -532,6 +694,32 @@ if (error) throw new Error(error.message);
             .in("id_registro", idsToReject);
 
           if (error) throw new Error(error.message);
+
+// ENVIAR ALERTA DE RECHAZO (ROJO CLARO)
+          const { data: pedidosRechazados } = await db.from("pedidos_adicionales").select("*").in("id_registro", idsToReject);
+          if (pedidosRechazados) {
+            for (const p of pedidosRechazados) {
+              const correos = await obtenerCorreosNotificacion(db, p.usuario_solicitante);
+              const detallesHtml = {
+                "ID Registro": p.id_registro,
+                "Tipo Solicitud": p.tipo_solicitud, // Se agregó el tipo de solicitud
+                "Estatus": "Rechazado",
+                "Motivo": `<span style="color:#ef4444; font-weight:bold;">${comentarioRechazo}</span>`,
+                "Rechazado por": aprobador,
+                "Fecha Rechazo": nowStr
+              };
+              const html = generarHtmlCorreo(
+                "Solicitud Rechazada", 
+                "#ef4444", 
+                `Le informamos que su solicitud <b>${p.id_registro}</b> ha sido revisado por el equipo y se ha determinado su <b>rechazo</b>.`, 
+                detallesHtml, 
+                "Si requiere más información sobre los motivos de esta decisión, por favor póngase en contacto con el equipo de operaciones."
+              );
+              // Se actualizó el asunto del correo
+              await enviarAlertaCorreo(correos, `Solicitud Rechazada [${p.id_registro}]`, html);
+            }
+          }
+
           return { ok: true, count: idsToReject.length };
         }
 
