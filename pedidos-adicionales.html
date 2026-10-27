@@ -204,12 +204,19 @@
 
 <!-- Sub-Grilla de Despacho -->
         <div class="table-wrap" style="border: 1px solid var(--border); border-radius: 12px; margin-top: 14px; min-height: 120px;">
-          <table>
-            <thead style="background: #d4d4d4;">
-              <tr><th>Cliente</th><th>Pedido</th><th>OC</th><th>Valor</th><th>Fecha</th><th>Acción</th></tr>
+          <table style="width: 100% !important; min-width: 100% !important; max-width: 100% !important; table-layout: fixed; white-space: normal; font-size: 12px; border-collapse: collapse;">
+            <thead style="background: #f8fafc;">
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <th style="width: 18%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">CLIENTE</th>
+                <th style="width: 15%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">PEDIDO</th>
+                <th style="width: 25%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">OC</th>
+                <th style="width: 15%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">VALOR</th>
+                <th style="width: 17%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">FECHA</th>
+                <th style="width: 10%; padding: 12px 4px; text-align: center; color: #475569; box-sizing: border-box;">ACCIÓN</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="empty">No hay pedidos añadidos</td></tr>
+              <tr><td colspan="6" class="empty" style="text-align: center; padding: 15px;">No hay pedidos añadidos</td></tr>
             </tbody>
           </table>
         </div>

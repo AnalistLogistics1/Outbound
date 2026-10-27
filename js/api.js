@@ -596,14 +596,15 @@ async function enviarAlertaCorreo(destinatarios, asunto, html) {
               detallesHtml["Responsable"] = p.usuario_solicitante;
               detallesHtml["Fecha"] = p.fecha_registro;
 
-                const html = generarHtmlCorreo(
-                "Solicitud Pendiente", // Se actualizó el título
+               const html = generarHtmlCorreo(
+                "Solicitud Pendiente", 
                 "#eab308", 
                 "El equipo está trabajando en su solicitud activamente. A continuación, los detalles de la solicitud:", 
                 detallesHtml, 
-                "El solicitud se encuentra en estado PENDIENTE de aprobación."
+                "La solicitud se encuentra en estado PENDIENTE de aprobación."
               );
-              await enviarAlertaCorreo(correos, `Nueva Solicitud Creada [${p.id_registro}]`, html);
+              // Se inserta dinámicamente el tipo de solicitud entre comillas
+              await enviarAlertaCorreo(correos, `Nueva Solicitud "${p.tipo_solicitud}" Creada [${p.id_registro}]`, html);
             }
           }
 
@@ -652,15 +653,15 @@ async function enviarAlertaCorreo(destinatarios, asunto, html) {
                 "Aprobado por": aprobador,
                 "Fecha Aprobación": nowStr
               };
-              const html = generarHtmlCorreo(
+                const html = generarHtmlCorreo(
                 "Solicitud Aprobada", 
                 "#22c55e", 
                 `Nos complace informarle que su solicitud <b>${p.id_registro}</b> ha sido <b>aprobado exitosamente</b>.`, 
                 detallesHtml, 
                 "La solicitud ha sido aprobado en el sistema."
               );
-              // Se actualizó el asunto del correo
-              await enviarAlertaCorreo(correos, `Solicitud Aprobada [${p.id_registro}]`, html);
+              // Se agrega la etiqueta [EXTERNAL] y el tipo de solicitud dinámico
+              await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Aprobada [${p.id_registro}]`, html);
             }
           }
 
@@ -708,15 +709,15 @@ async function enviarAlertaCorreo(destinatarios, asunto, html) {
                 "Rechazado por": aprobador,
                 "Fecha Rechazo": nowStr
               };
-              const html = generarHtmlCorreo(
+                const html = generarHtmlCorreo(
                 "Solicitud Rechazada", 
                 "#ef4444", 
                 `Le informamos que su solicitud <b>${p.id_registro}</b> ha sido revisado por el equipo y se ha determinado su <b>rechazo</b>.`, 
                 detallesHtml, 
                 "Si requiere más información sobre los motivos de esta decisión, por favor póngase en contacto con el equipo de operaciones."
               );
-              // Se actualizó el asunto del correo
-              await enviarAlertaCorreo(correos, `Solicitud Rechazada [${p.id_registro}]`, html);
+              // Se agrega la etiqueta [EXTERNAL] y el tipo de solicitud dinámico
+              await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Rechazada [${p.id_registro}]`, html);
             }
           }
 

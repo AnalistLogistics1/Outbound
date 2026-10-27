@@ -152,6 +152,19 @@ document.addEventListener("DOMContentLoaded", () => {
     modal.classList.remove("is-open");
     modal.setAttribute("aria-hidden", "true");
   }
+// --- RESTRICCIÓN DE FECHAS (Mínimo Hoy) ---
+  const today = new Date();
+  const minDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  
+  // Bloquear fechas pasadas en Modal Despacho
+  const inputFechaDespacho = document.getElementById("despFecha");
+  if (inputFechaDespacho) inputFechaDespacho.setAttribute("min", minDateStr);
+  
+  // Bloquear fechas pasadas en Modal Recepción (busca el primer input de tipo date)
+  if (modalRecepcion) {
+    const inputFechaRecepcion = modalRecepcion.querySelector('input[type="date"]');
+    if (inputFechaRecepcion) inputFechaRecepcion.setAttribute("min", minDateStr);
+  }
 
   // --- APERTURA DE NUEVAS SOLICITUDES ---
   if (btnRecepcionMain) btnRecepcionMain.addEventListener("click", () => {
@@ -238,23 +251,34 @@ if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un c
     });
   }
 
-  function renderSubTablaDespacho(isReadOnly = false) {
+function renderSubTablaDespacho(isReadOnly = false) {
     if (!tbodyDespacho) return;
     if (pedidosDespachoTemp.length === 0) {
-      tbodyDespacho.innerHTML = `<tr><td colspan="6" class="empty">No hay pedidos añadidos</td></tr>`;
+      tbodyDespacho.innerHTML = `<tr><td colspan="6" class="empty" style="text-align: center; padding: 15px;">No hay pedidos añadidos</td></tr>`;
       return;
     }
     tbodyDespacho.innerHTML = pedidosDespachoTemp.map((p, i) => {
       const accionHtml = isReadOnly 
-        ? `<td style="text-align:center; color:#64748b;">-</td>` 
-        : `<td style="color:red; cursor:pointer; text-align:center; font-weight:bold;" onclick="eliminarDespachoTemp(${i})">X</td>`;
+        ? `<td style="width: 10%; text-align:center; color:#64748b; padding: 10px 4px; box-sizing: border-box;">-</td>` 
+        : `<td style="width: 10%; color:red; cursor:pointer; text-align:center; font-weight:bold; padding: 10px 4px; box-sizing: border-box;" onclick="eliminarDespachoTemp(${i})">X</td>`;
+      
+      // Lógica para formatear la fecha de AAAA-MM-DD a DD/MM/AAAA
+      let fechaOriginal = p.detalles["Fecha despacho"] || "-";
+      let fechaFormateada = fechaOriginal;
+      if (fechaOriginal.includes("-")) {
+        const partes = fechaOriginal.split("-");
+        if (partes.length === 3) {
+          fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+      }
+
       return `
-      <tr>
-        <td>${p.detalles["Cliente"] || "-"}</td>
-        <td>${p.detalles["Pedido"] || "-"}</td>
-        <td>${p.detalles["OC"] || "-"}</td>
-        <td>${p.detalles["Valor Venta"] || "-"}</td>
-        <td>${p.detalles["Fecha despacho"] || "-"}</td>
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="width: 18%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Cliente"] || "-"}</td>
+        <td style="width: 15%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Pedido"] || "-"}</td>
+        <td style="width: 25%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["OC"] || "-"}</td>
+        <td style="width: 15%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Valor Venta"] || "-"}</td>
+        <td style="width: 17%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box;">${fechaFormateada}</td>
         ${accionHtml}
       </tr>
     `}).join("");
