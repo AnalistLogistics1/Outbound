@@ -363,12 +363,18 @@
 
     setBotonLoading(true);
 
-    try {
+try {
       const response = await window.apiPost("login", {
         usuario,
         username: usuario,
         password
       });
+
+      
+// Verificar si la API devolvió un error (ej. clave incorrecta)
+      if (!response || !response.ok || !response.token) {
+        throw new Error(response?.message || "Usuario o Clave incorrecta");
+      }
 
       if (typeof window.saveSession !== "function") {
         throw new Error("No se cargó correctamente js/auth.js.");
@@ -378,8 +384,11 @@
       window.location.replace(getSafeMenuUrl());
       
     } catch (error) {
-      mostrarAlertaBonita(error.message || "Verifique sus datos.", "Acceso denegado");
-      el.password.focus();
+      mostrarAlertaBonita(error.message || "Usuario o Clave incorrecta", "Acceso denegado");
+      if (el.password) {
+        el.password.value = "";
+        el.password.focus();
+      }
     } finally {
       setBotonLoading(false);
     }

@@ -263,10 +263,10 @@ async function enviarAlertaCorreo(destinatarios, asunto, html) {
             .limit(1)
             .maybeSingle();
 
-          if (error) throw new Error(error.message || "Error consultando el usuario.");
+if (error) throw new Error(error.message || "Error consultando el usuario.");
           if (!userRow) throw new Error("Usuario no encontrado.");
           if (action === "login" && String(userRow.clave) !== String(claveInput)) {
-            throw new Error("Contraseña incorrecta.");
+            throw new Error("Usuario o Clave incorrecta");
           }
 
           const user = {

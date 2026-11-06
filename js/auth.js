@@ -40,8 +40,12 @@
     };
   }
 
-  function saveSession(session) {
+function saveSession(session) {
     const token = session?.token || session?.session?.token || "";
+    if (!token) {
+      throw new Error("No se recibió un token de sesión válido.");
+    }
+
     const normalizedUser = normalizeAuthUser(session?.user || session?.session || {});
 
     localStorage.setItem(STORAGE_KEYS.token, token);

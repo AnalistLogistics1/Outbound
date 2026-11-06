@@ -639,17 +639,108 @@ function actualizarContadores() {
     if (modal.querySelector(".btn-soft")) modal.querySelector(".btn-soft").style.display = "none";
   };
 
-  async function cargarClientes() {
-    try {
-      const meta = await window.apiPost("getLotesMeta", { token });
-      if (meta.clientes && meta.clientes.length > 0) {
-        const inputCliente = modalDespacho?.querySelector("select");
-        if(inputCliente) {
-          inputCliente.innerHTML = `<option value="">Seleccione Cliente</option>` + 
-            meta.clientes.map(c => `<option value="${c}">${c}</option>`).join("");
-        }
-      }
-    } catch (error) { console.warn("No se pudieron cargar los clientes:", error); }
+async function cargarClientes() {
+    const listaClientes = [
+      "3MWF DISTRIBUCIONES S.A.C",
+      "5M DISTRIBUCIONES S.R.L.",
+      "AD ARQ & FILMS SAC",
+      "AGP PERU S.A.C.",
+      "ALOCEN REPRESENTACIONES S.A.C.",
+      "ALPAYANA S.A. SOBREANDES",
+      "AUTO DISTRIBUCION S.A.C.",
+      "BELOW TRADE S.A.C.",
+      "CARP & ASOCIADOS S.R.L.",
+      "CASA/LOGISTICA ANTEZANA SAC",
+      "CASIMIRES NABILA S.A.C.",
+      "CHEMTRADE S.A.C.",
+      "CODELPA PERU S.A.C.",
+      "COMERCIALIZADORA MERCASA SAC",
+      "COMISIONISTAS LINCE S.A.C",
+      "COMPA#IA MINERA ANTAMINA S.A.",
+      "COMPA#IA MINERA CHUNGAR SAC",
+      "CONSTRUCCION Y ADMINISTRACION",
+      "COROIMPORT S.A.C.",
+      "CORPORACION ACEROS AREQUIPA S.",
+      "CORPORACION AMBIENTAL ALANCO",
+      "CORPORACION PRIMAX S.A.",
+      "CORPORACION VEGA S.A.C.",
+      "COSALCO PERU S.A.C.",
+      "CPPQ S.A.",
+      "CSE DEL PERU S.A.C.",
+      "DARYZA S.A.C.",
+      "DE RAMPER S.A.C.",
+      "DELIVERY HERO DMART PERU S.A.C",
+      "DIMERC PERU S.A.C.",
+      "DINET S.A.",
+      "DISLAC S.R.L.",
+      "DISTRIBUCIONES PRIMOS S.A.C.",
+      "DISTRIBUID. COMERCIAL ALVAREZ",
+      "DISTRIBUIDORA JIMENEZ E IRIART",
+      "DROGUERIA SAN MARTIN S.A.C.",
+      "EMUSA PERU S.A.C.",
+      "ENEL DISTRIBUCION PERU S.A.A.",
+      "EXANCO S.A.C.",
+      "EXPLOSIVOS DEL SUR S.A.",
+      "EXSA S.A.",
+      "FAMESA EXPLOSIVOS S.A.C.",
+      "FARMIVENT S.A.C.",
+      "FAVO S.A.C.",
+      "FERRETERIA Y MATERIALES DE CONSTRUCCIÓN S.R.L. – FEMACO",
+      "FRESHMART S.A.C.",
+      "G.W.YICHANG & CIA S.A.",
+      "GESA CENTRO S.A.C.",
+      "HUEMURA SAC",
+      "IMPORT.FERRETERA BONIFAZ S.A.C",
+      "INGETRAFIC S.R.L.",
+      "JIMENEZ NORTE S.A",
+      "LAIVE S.A.",
+      "LAMICENTER S.A.C.",
+      "LANCERO S.A.C.",
+      "LLV PERU SAC",
+      "LUCKY S.A.C.",
+      "M. ELECTRO S.A.",
+      "MINERA AURIFERA RETAMAS S.A.",
+      "MINERA YANACOCHA S.R.L.",
+      "MONDELEZ PERU S.A.",
+      "MORAN DISTRIBUCIONES S.A.",
+      "NESTLE PERU S.A.",
+      "OXIDOS DE PASCO S.A.C.",
+      "PERUFARMA S.A.",
+      "PERUPLAST S.A.",
+      "PLUSPETROL PERU CORPORATION S.A.",
+      "PROCTER & GAMBLE PERU S.R.L.",
+      "PRODUCTOS ALIMENTOS GOLOSINAS S.A.C.",
+      "PRODUCTOS INDUSTRIALES ARTI SA",
+      "PROMOTORES ELECTRICOS S A",
+      "PROSAC S.A.",
+      "QSI PERU S.A.",
+      "QUIMIGRAF PERU SAC",
+      "RASH PERU S.A.C.",
+      "RINTI S.A",
+      "ROAD SERVICE PERU S.A.C",
+      "RODPAZ S.A.C.",
+      "SEKUR PERU S.A.",
+      "SIGELEC S.A.C.",
+      "SOCIEDAD MINERA CERRO",
+      "SOL NACIENTE DEL NORTE DISTRIB",
+      "SOLTRAK S.A.",
+      "SONEPAR PERU S.A.C.",
+      "SR3 S.A.C.",
+      "TAI LOY S.A.",
+      "TECNOLOGIA DE MATERIALES S.A.",
+      "TECNOLOGIA INDUSTRIAL",
+      "TECSUR S.A.",
+      "TELEFONICA DEL PERU S.A.A.",
+      "VELAX S.A.",
+      "VENDTECH S.A.C.",
+      "ZARPE DEL PERU S.A.C."
+    ];
+
+    const inputCliente = document.getElementById("despCliente") || modalDespacho?.querySelector("select");
+    if (inputCliente) {
+      inputCliente.innerHTML = `<option value="">Seleccione Cliente</option>` + 
+        listaClientes.map(c => `<option value="${c}">${c}</option>`).join("");
+    }
   }
 
   toggleLoader(true, "Iniciando", "Cargando registros...");
