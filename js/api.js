@@ -611,10 +611,11 @@ if (error) throw new Error(error.message || "Error consultando el usuario.");
           return { ok: true, count: insertData.length };
         }
 
-        case "listPedidosAdicionales": {
-          const { data, error } = await db.from("pedidos_adicionales").select("*").order("fecha_registro", { ascending: false });
+case "listPedidosAdicionales": {
+          const { data, error } = await db.from("pedidos_adicionales").select("*");
           if (error) throw new Error(error.message);
-          return { ok: true, rows: data || [] };
+          const rows = (data || []).sort((a, b) => parseDateForSort(b.fecha_registro) - parseDateForSort(a.fecha_registro));
+          return { ok: true, rows };
         }
 
         // ==========================================

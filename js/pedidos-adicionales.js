@@ -125,7 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function showSuccessModal(message) {
+function showSuccessModal(message) {
     if (!successModal) return;
     if (successMessage) successMessage.textContent = message;
     successModal.classList.add("is-open");
@@ -136,6 +136,24 @@ document.addEventListener("DOMContentLoaded", () => {
     btnCerrarSuccess.addEventListener("click", () => {
       successModal.classList.remove("is-open");
       successModal.setAttribute("aria-hidden", "true");
+    });
+  }
+
+  const warningModal = document.getElementById("warningModal");
+  const warningMessage = document.getElementById("warningMessage");
+  const btnCerrarWarning = document.getElementById("btnCerrarWarning");
+
+  function showWarningModal(message) {
+    if (!warningModal) return alert(message);
+    if (warningMessage) warningMessage.textContent = message;
+    warningModal.classList.add("is-open");
+    warningModal.setAttribute("aria-hidden", "false");
+  }
+
+  if (btnCerrarWarning) {
+    btnCerrarWarning.addEventListener("click", () => {
+      warningModal.classList.remove("is-open");
+      warningModal.setAttribute("aria-hidden", "true");
     });
   }
 
@@ -209,9 +227,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const valor = document.getElementById("despValor").value;
       const fecha = document.getElementById("despFecha").value;
       const tipo = document.getElementById("despTipo").value;
+      const m3Raw = document.getElementById("despM3") ? document.getElementById("despM3").value.trim() : "";
       const comentarios = document.getElementById("despComentarios").value;
 
-if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un cliente válido.", "warning");
+      if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un cliente válido.", "warning");
       
       // Validación estricta de 6 caracteres numéricos
       const esNumero6Digitos = /^\d{6}$/.test(pedido);
@@ -220,6 +239,12 @@ if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un c
       }
 
       if (!tipo || tipo === "") return showToast("Seleccione un tipo de despacho.", "warning");
+
+      // Validación de M3 como número entero positivo
+      if (!m3Raw || !/^\d+$/.test(m3Raw) || parseInt(m3Raw, 10) <= 0) {
+        return showToast("Ingrese un valor entero mayor a 0 en el campo M3.", "warning");
+      }
+      const m3Numero = parseInt(m3Raw, 10);
 
       if (comentarios.length < 5 || comentarios.length > 150) {
         return showToast("El comentario debe tener entre 5 y 150 caracteres.", "warning");
@@ -236,6 +261,7 @@ if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un c
           "Valor Venta": valor ? `${moneda} ${valor}` : "",
           "Fecha despacho": fecha,
           "Tipo": tipo,
+          "M3": m3Numero,
           "Comentarios": comentarios
         }
       });
@@ -246,18 +272,22 @@ if (!cliente || cliente === "Buscar Clientes") return showToast("Seleccione un c
       document.getElementById("despPedido").value = "";
       document.getElementById("despOC").value = "";
       document.getElementById("despValor").value = "";
+      if (document.getElementById("despM3")) document.getElementById("despM3").value = "";
       
       showToast("Pedido añadido a la bandeja.", "ok");
     });
   }
 
-function renderSubTablaDespacho(isReadOnly = false) {
+  function renderSubTablaDespacho(isReadOnly = false) {
     if (!tbodyDespacho) return;
     if (pedidosDespachoTemp.length === 0) {
-      tbodyDespacho.innerHTML = `<tr><td colspan="6" class="empty" style="text-align: center; padding: 15px;">No hay pedidos añadidos</td></tr>`;
+      tbodyDespacho.innerHTML = `<tr><td colspan="7" class="empty" style="text-align: center; padding: 15px;">No hay pedidos añadidos</td></tr>`;
       return;
     }
-    tbodyDespacho.innerHTML = pedidosDespachoTemp.map((p, i) => {
+
+    let sumaTotalM3 = 0;
+
+    const filasHtml = pedidosDespachoTemp.map((p, i) => {
       const accionHtml = isReadOnly 
         ? `<td style="width: 10%; text-align:center; color:#64748b; padding: 10px 4px; box-sizing: border-box;">-</td>` 
         : `<td style="width: 10%; color:red; cursor:pointer; text-align:center; font-weight:bold; padding: 10px 4px; box-sizing: border-box;" onclick="eliminarDespachoTemp(${i})">X</td>`;
@@ -272,16 +302,31 @@ function renderSubTablaDespacho(isReadOnly = false) {
         }
       }
 
+      const m3Val = parseInt(p.detalles["M3"], 10) || 0;
+      sumaTotalM3 += m3Val;
+
       return `
       <tr style="border-bottom: 1px solid #f1f5f9;">
         <td style="width: 18%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Cliente"] || "-"}</td>
-        <td style="width: 15%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Pedido"] || "-"}</td>
-        <td style="width: 25%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["OC"] || "-"}</td>
-        <td style="width: 15%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Valor Venta"] || "-"}</td>
-        <td style="width: 17%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box;">${fechaFormateada}</td>
+        <td style="width: 13%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Pedido"] || "-"}</td>
+        <td style="width: 20%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["OC"] || "-"}</td>
+        <td style="width: 14%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box; word-break: break-all;">${p.detalles["Valor Venta"] || "-"}</td>
+        <td style="width: 15%; padding: 10px 4px; text-align: left; color: #334155; box-sizing: border-box;">${fechaFormateada}</td>
+        <td style="width: 10%; padding: 10px 4px; text-align: center; color: #334155; font-weight: bold; box-sizing: border-box;">${m3Val > 0 ? m3Val : "-"}</td>
         ${accionHtml}
       </tr>
     `}).join("");
+
+    // Fila resumen inferior con la suma total de M3
+    const filaTotalHtml = `
+      <tr style="background: #f8fafc; border-top: 2px solid #cbd5e1; font-weight: bold;">
+        <td colspan="5" style="padding: 10px 8px; text-align: right; color: #0f172a;">TOTAL M3:</td>
+        <td style="width: 10%; padding: 10px 4px; text-align: center; color: #0f4c81; font-size: 13px;">${sumaTotalM3}</td>
+        <td style="width: 10%; padding: 10px 4px;"></td>
+      </tr>
+    `;
+
+    tbodyDespacho.innerHTML = filasHtml + filaTotalHtml;
   }
 
   window.eliminarDespachoTemp = (index) => {
@@ -295,6 +340,16 @@ function renderSubTablaDespacho(isReadOnly = false) {
   if (btnSolicitarDespacho) {
     btnSolicitarDespacho.addEventListener("click", async () => {
       if (pedidosDespachoTemp.length === 0) return showToast("Añada al menos un pedido.", "warning");
+
+// Validar que para el mismo cliente con "Despacho 24 H" la suma de M3 no supere 3 M3
+      const totalM3Despacho24H = pedidosDespachoTemp
+        .filter(p => p.detalles["Tipo"] === "Despacho 24 H")
+        .reduce((acc, p) => acc + (parseInt(p.detalles["M3"], 10) || 0), 0);
+
+      if (totalM3Despacho24H > 3) {
+        return showWarningModal(`Para "Despacho 24 H" el cliente no puede superar los 3 M3 en total (Suma actual: ${totalM3Despacho24H} M3).`);
+      }
+
       toggleLoader(true, "Registrando Pedidos", "Guardando solicitudes en base de datos...");
       try {
         await window.apiPost("savePedidoAdicional", pedidosDespachoTemp);
@@ -382,6 +437,19 @@ function actualizarContadores() {
     actualizarBotonesAcciones();
   };
 
+function parseFechaCronologica(fechaStr) {
+    const raw = String(fechaStr || "").trim();
+    if (!raw) return 0;
+    // Soporta formato DD/MM/AAAA HH:mm:ss
+    const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (match) {
+      const [, d, m, y, h = "0", mi = "0", s = "0"] = match;
+      return new Date(Number(y), Number(m) - 1, Number(d), Number(h), Number(mi), Number(s)).getTime();
+    }
+    const parsed = new Date(raw).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
   async function cargarTracker() {
     if (!tablaTrackerRecepcion || !tablaTrackerDespacho) return;
     idsSeleccionados.clear();
@@ -389,7 +457,10 @@ function actualizarContadores() {
 
     try {
       const res = await window.apiPost("listPedidosAdicionales", { token });
-      window.trackerData = res.rows || [];
+      const rows = res.rows || [];
+      // Ordenar cronológicamente desde la fecha más reciente hasta la más antigua
+      rows.sort((a, b) => parseFechaCronologica(b.fecha_registro) - parseFechaCronologica(a.fecha_registro));
+      window.trackerData = rows;
       actualizarContadores();
       renderizarTablas();
       ajustarColumnasAprobador();
@@ -592,10 +663,11 @@ function actualizarContadores() {
       }
       document.getElementById("despFecha").value = registro.detalles["Fecha despacho"] || "";
       document.getElementById("despTipo").value = registro.detalles["Tipo"] || "";
+      if (document.getElementById("despM3")) document.getElementById("despM3").value = registro.detalles["M3"] || "";
       document.getElementById("despComentarios").value = registro.detalles["Comentarios"] || "";
       
       pedidosDespachoTemp = [{ detalles: registro.detalles }];
-      renderSubTablaDespacho(true); 
+      renderSubTablaDespacho(true);
     } else {
       const inputs = modal.querySelectorAll("input, select, textarea");
       inputs.forEach(inp => {

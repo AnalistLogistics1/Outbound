@@ -176,29 +176,37 @@
             <label>Cliente</label>
             <select id="despCliente"><option>Buscar Clientes</option></select>
           </div>
-<!-- Se restringe Pedido a 6 numéricos -->
+          <!-- Se restringe Pedido a 6 numéricos -->
           <div class="field"><label>Pedido</label><input type="text" id="despPedido" placeholder="6 dígitos (Ej: 123456)" maxlength="6" pattern="[0-9]{6}"></div>
           <div class="field"><label>OC</label><input type="text" id="despOC" placeholder="Ingrese número de OC"></div>
           
-          <div class="field">
-            <label>Valor Venta</label>
-            <div style="display: flex; gap: 8px;">
-              <select id="despMoneda" style="width: 70px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 14px; outline: none; background: #ffffff;">
-                <option value="S/">S/</option>
-                <option value="$">$</option>
+          <!-- Fila de 4 columnas a la misma altura: Valor Venta, Fecha despacho, Tipo y M3 -->
+          <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr 1fr 0.7fr; gap: 14px; align-items: end;">
+            <div class="field">
+              <label>Valor Venta</label>
+              <div style="display: flex; gap: 8px;">
+                <select id="despMoneda" style="width: 70px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 14px; outline: none; background: #ffffff;">
+                  <option value="S/">S/</option>
+                  <option value="$">$</option>
+                </select>
+                <input type="number" id="despValor" placeholder="0.00" style="flex: 1; min-width: 0;">
+              </div>
+            </div>
+            <div class="field"><label>Fecha despacho</label><input type="date" id="despFecha"></div>
+            <div class="field">
+              <label>Tipo</label>
+              <select id="despTipo">
+                <option value="" selected disabled>Seleccione Tipo</option>
+                <option value="Despacho 24 H">Despacho 24 H</option>
+                <option value="Urgencia">Urgencia</option>
               </select>
-              <input type="number" id="despValor" placeholder="0.00" style="flex: 1;">
+            </div>
+            <div class="field">
+              <label>M3</label>
+              <input type="number" id="despM3" placeholder="Ej: 1" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
             </div>
           </div>
-          <div class="field"><label>Fecha despacho</label><input type="date" id="despFecha"></div>
-          <div class="field">
-            <label>Tipo</label>
-            <select id="despTipo">
-              <option value="" selected disabled>Seleccione Tipo</option>
-              <option value="Despacho 24 H">Despacho 24 H</option>
-              <option value="Urgencia">Urgencia</option>
-            </select>
-          </div>
+
           <div class="field field-full"><label>Comentarios</label><textarea id="despComentarios" rows="2" placeholder="Ingrese comentarios (Mínimo 5 caracteres)" minlength="5" maxlength="150"></textarea></div>
         </div>
 
@@ -208,15 +216,16 @@
             <thead style="background: #f8fafc;">
               <tr style="border-bottom: 1px solid #e2e8f0;">
                 <th style="width: 18%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">CLIENTE</th>
-                <th style="width: 15%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">PEDIDO</th>
-                <th style="width: 25%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">OC</th>
-                <th style="width: 15%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">VALOR</th>
-                <th style="width: 17%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">FECHA</th>
+                <th style="width: 13%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">PEDIDO</th>
+                <th style="width: 20%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">OC</th>
+                <th style="width: 14%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">VALOR</th>
+                <th style="width: 15%; padding: 12px 4px; text-align: left; color: #475569; box-sizing: border-box;">FECHA</th>
+                <th style="width: 10%; padding: 12px 4px; text-align: center; color: #475569; box-sizing: border-box;">M3</th>
                 <th style="width: 10%; padding: 12px 4px; text-align: center; color: #475569; box-sizing: border-box;">ACCIÓN</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="empty" style="text-align: center; padding: 15px;">No hay pedidos añadidos</td></tr>
+              <tr><td colspan="7" class="empty" style="text-align: center; padding: 15px;">No hay pedidos añadidos</td></tr>
             </tbody>
           </table>
         </div>
@@ -274,10 +283,22 @@
         <textarea id="txtComentarioRechazo" rows="3" placeholder="Ingrese el motivo (Mínimo 5, Máximo 100 caracteres)" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: inherit; font-size: 13px; resize: none; margin-top: 5px; box-sizing: border-box;"></textarea>
       </div>
 
-      <div style="display: flex; gap: 10px; width: 100%;">
+<div style="display: flex; gap: 10px; width: 100%;">
         <button id="btnCancelarConfirm" class="btn" style="flex: 1; background: #f1f5f9; color: #475569; box-shadow: none;">Cancelar</button>
         <button id="btnAceptarConfirm" class="btn" style="flex: 1; background: #991b1b; color: #ffffff; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">Rechazar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Warning Modal (Ventana emergente de restricción que obliga a dar en Aceptar) -->
+  <div class="custom-loader-backdrop" id="warningModal" aria-hidden="true" style="z-index: 100002;">
+    <div class="custom-loader-card" style="padding-bottom: 24px; max-width: 380px;">
+      <div style="width: 80px; height: 80px; border-radius: 50%; background: #fef3c7; border: 2px solid #f59e0b; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+        <img src="./img/logo.png" alt="SLS Logo" style="width: 50px; border-radius: 50%; background: #000;">
+      </div>
+      <h3 style="color: #d97706; font-size: 22px; margin-bottom: 6px;">¡Atención!</h3>
+      <p id="warningMessage" style="margin-bottom: 20px; color: #334155; font-size: 14px; line-height: 1.5; text-align: center;">Mensaje de alerta.</p>
+      <button id="btnCerrarWarning" class="btn btn-primary" style="width: 100%; background: #d97706; border: none;">Aceptar</button>
     </div>
   </div>
 
