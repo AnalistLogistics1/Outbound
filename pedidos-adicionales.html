@@ -12,7 +12,7 @@
 <body>
   <div id="contenedor-cabecera"></div>
 
-  <main class="page">
+  <main class="page" style="max-width: 1580px; width: 96%;">
     <section class="hero hero-centered">
       <div>
         <span class="eyebrow">Módulo logístico</span>
@@ -104,24 +104,27 @@
       </div>
 
       <!-- Vista Despacho -->
-      <div id="viewDespacho" class="table-wrap" style="display: none;">
-        <table>
+      <div id="viewDespacho" class="table-wrap" style="display: none; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
           <thead style="background: #d4d4d4;">
             <tr>
-              <th>ID</th>
-              <th>Fecha Registro</th>
-              <th>Cliente</th>
-              <th>Pedido</th>
-              <th>OC</th>
-              <th>Valor</th>
-              <th>Solicitante</th>
-              <th>Estado</th>
-              <th style="text-align:center;">Detalle</th>
-              <th style="text-align:center;" class="col-accion-aprobador">Acción</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">ID</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Fecha Registro</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Cliente</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Pedido</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">OC</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Volumen Total</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Tipo de solicitud</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Regla</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Valor Total</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Solicitante</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Estado</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;">Detalle</th>
+              <th style="white-space: nowrap; text-align: center; vertical-align: middle; padding: 12px 10px;" class="col-accion-aprobador">Acción</th>
             </tr>
           </thead>
           <tbody id="tablaTrackerDespacho">
-            <tr><td colspan="10" class="empty">Cargando registros...</td></tr>
+            <tr><td colspan="13" class="empty" style="text-align: center;">Cargando registros...</td></tr>
           </tbody>
         </table>
       </div>
@@ -146,10 +149,10 @@
           <div class="field"><label>Fecha</label><input type="date"></div>
           <div class="field"><label>Hora de llegada 12H</label><input type="time" placeholder="Ejemplo: 03:00 PM"></div>
           
-          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios (Mínimo 5 caracteres)" minlength="5" maxlength="150"></textarea></div>
+          <div class="field field-full"><label>Comentarios</label><textarea rows="2" placeholder="Ingrese comentarios (Opcional)" maxlength="150"></textarea></div>
         </div>
 
-<!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
+        <!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
         <div class="aprobacion-info" style="display: none; margin-top: 16px; padding: 12px; border-radius: 12px; transition: all 0.3s;">
            <p style="margin: 0; font-size: 13px;"><strong class="lbl-titulo-fecha">Fecha:</strong> <span class="lbl-fecha-accion">-</span></p>
            <p style="margin: 4px 0 0 0; font-size: 13px;"><strong class="lbl-titulo-usuario">Usuario:</strong> <span class="lbl-usuario-accion">-</span></p>
@@ -171,17 +174,36 @@
         <button type="button" class="modal-close" id="cerrarDespacho">x</button>
       </div>
       <form class="modal-body">
-<div class="dynamic-grid grid-3">
-          <div class="field">
-            <label>Cliente</label>
-            <select id="despCliente"><option>Buscar Clientes</option></select>
+        <div id="tituloDatosRegistrados" style="font-size: 13px; font-weight: 800; color: #0f4c81; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px;">
+          DATOS REGISTRADOS
+        </div>
+        <div class="dynamic-grid grid-3">
+          <!-- Primera fila: Tipo (a la izquierda de Cliente), Cliente, Pedido y OC -->
+          <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1.4fr 1fr 1fr; gap: 14px; align-items: end;">
+            <div class="field">
+              <label>Tipo</label>
+              <select id="despTipo">
+                <option value="" selected disabled>Seleccione Tipo</option>
+                <option value="Despacho 24 H">Despacho 24 H</option>
+                <option value="Urgencia">Urgencia</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Cliente</label>
+              <select id="despCliente"><option>Buscar Clientes</option></select>
+            </div>
+            <div class="field">
+              <label>Pedido</label>
+              <input type="text" id="despPedido" placeholder="6 dígitos (Ej: 123456)" maxlength="6" pattern="[0-9]{6}">
+            </div>
+            <div class="field">
+              <label>OC</label>
+              <input type="text" id="despOC" placeholder="Ingrese número de OC">
+            </div>
           </div>
-          <!-- Se restringe Pedido a 6 numéricos -->
-          <div class="field"><label>Pedido</label><input type="text" id="despPedido" placeholder="6 dígitos (Ej: 123456)" maxlength="6" pattern="[0-9]{6}"></div>
-          <div class="field"><label>OC</label><input type="text" id="despOC" placeholder="Ingrese número de OC"></div>
-          
-          <!-- Fila de 4 columnas a la misma altura: Valor Venta, Fecha despacho, Tipo y M3 -->
-          <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr 1fr 0.7fr; gap: 14px; align-items: end;">
+
+          <!-- Segunda fila: Valor Venta, Fecha despacho y M3 -->
+          <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr 0.7fr; gap: 14px; align-items: end;">
             <div class="field">
               <label>Valor Venta</label>
               <div style="display: flex; gap: 8px;">
@@ -194,23 +216,15 @@
             </div>
             <div class="field"><label>Fecha despacho</label><input type="date" id="despFecha"></div>
             <div class="field">
-              <label>Tipo</label>
-              <select id="despTipo">
-                <option value="" selected disabled>Seleccione Tipo</option>
-                <option value="Despacho 24 H">Despacho 24 H</option>
-                <option value="Urgencia">Urgencia</option>
-              </select>
-            </div>
-            <div class="field">
               <label>M3</label>
               <input type="number" id="despM3" placeholder="Ej: 1" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
             </div>
           </div>
 
-          <div class="field field-full"><label>Comentarios</label><textarea id="despComentarios" rows="2" placeholder="Ingrese comentarios (Mínimo 5 caracteres)" minlength="5" maxlength="150"></textarea></div>
+          <div class="field field-full"><label>Comentarios</label><textarea id="despComentarios" rows="2" placeholder="Ingrese comentarios (Opcional)" maxlength="150"></textarea></div>
         </div>
 
-<!-- Sub-Grilla de Despacho -->
+        <!-- Sub-Grilla de Despacho -->
         <div class="table-wrap" style="border: 1px solid var(--border); border-radius: 12px; margin-top: 14px; min-height: 120px;">
           <table style="width: 100% !important; min-width: 100% !important; max-width: 100% !important; table-layout: fixed; white-space: normal; font-size: 12px; border-collapse: collapse;">
             <thead style="background: #f8fafc;">
@@ -230,7 +244,47 @@
           </table>
         </div>
 
-<!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
+        <!-- APARTADO: DATOS APROBADOR (Para Solicitudes de Urgencia) -->
+        <div id="seccionDatosAprobador" style="display: none; margin-top: 18px; padding: 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px;">
+          <div style="font-size: 13px; font-weight: 800; color: #0f4c81; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; border-bottom: 2px solid #cbd5e1; padding-bottom: 4px;">
+            DATOS APROBADOR
+          </div>
+
+          <!-- Costo Flete (Desplegable S/ y $ + Monto) -->
+          <div class="field" style="max-width: 340px;">
+            <label style="font-weight: bold; color: #334155;">COSTO FLETE</label>
+            <div style="display: flex; gap: 8px;">
+              <select id="aprobMonedaFlete" style="width: 75px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 14px; outline: none; background: #ffffff; font-weight: bold;">
+                <option value="S/">S/</option>
+                <option value="$">$</option>
+              </select>
+              <input type="number" id="aprobCostoFlete" placeholder="0.00" min="0" step="0.01" style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 14px; background: #ffffff;">
+            </div>
+          </div>
+
+          <!-- Campo Visual: Costo /valor venta <2% -->
+          <div class="field" style="max-width: 340px; margin-top: 12px;">
+            <label style="font-weight: bold; color: #334155;">Costo /valor venta &lt;2%</label>
+            <input type="text" id="aprobPorcentajeFlete" value="0.00%" readonly style="padding: 10px 14px; border-radius: 14px; border: 1px solid #cbd5e1; background: #f1f5f9; font-weight: 800; font-size: 14px; text-align: center; outline: none;">
+          </div>
+
+          <!-- Opciones adicionales cuando el porcentaje es >= 2% (ROJO) -->
+          <div id="contenedorFleteRojo" style="display: none; margin-top: 14px; padding: 12px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 10px;">
+            <div class="field" id="wrapModoAprobacionRojo" style="margin-bottom: 10px;">
+              <label style="font-weight: bold; color: #991b1b; font-size: 12px;">Acción para Costo &gt;= 2%</label>
+              <select id="aprobModoRojo" style="width: 100%; padding: 10px; border: 1px solid #fca5a5; border-radius: 10px; background: #ffffff; color: #334155; font-weight: bold;">
+                <option value="PENDIENTE_GERENCIA">Enviar a 2da Aprobación por Gerencia</option>
+                <option value="COORDINACION_INTERNA">Aprobar Directamente (Coordinación Interna Aprobador 1 y 2)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label style="font-weight: bold; color: #991b1b; font-size: 12px;">Comentario Obligatorio (Sustento Costo &gt;= 2%)</label>
+              <textarea id="aprobComentarioUrgencia" rows="2" placeholder="Ingrese el sustento o detalle de coordinación interna (Obligatorio)" style="width: 100%; padding: 10px; border: 1px solid #fca5a5; border-radius: 10px; background: #ffffff; box-sizing: border-box;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contenedor de Aprobación/Rechazo (Oculto por defecto) -->
         <div class="aprobacion-info" style="display: none; margin-top: 16px; padding: 12px; border-radius: 12px; transition: all 0.3s;">
            <p style="margin: 0; font-size: 13px;"><strong class="lbl-titulo-fecha">Fecha:</strong> <span class="lbl-fecha-accion">-</span></p>
            <p style="margin: 4px 0 0 0; font-size: 13px;"><strong class="lbl-titulo-usuario">Usuario:</strong> <span class="lbl-usuario-accion">-</span></p>
@@ -240,12 +294,13 @@
         <div class="modal-actions" style="margin-top: 14px;">
           <button type="button" class="btn btn-soft">Añadir pedido</button>
           <button type="button" class="btn btn-primary">Solicitar Aprobación</button>
+          <button type="button" id="btnConfirmarAprobUrgencia" class="btn btn-primary" style="display: none; background: #16a34a; border: none;">Aceptar</button>
         </div>
       </form>
     </div>
   </div>
 
-<!-- Custom Loader (Pantalla de carga con Logo) -->
+  <!-- Custom Loader (Pantalla de carga con Logo) -->
   <div class="custom-loader-backdrop" id="customLoader" aria-hidden="true">
     <div class="custom-loader-card">
       <div class="custom-loader-spinner">
@@ -256,7 +311,7 @@
     </div>
   </div>
 
-<!-- Success Modal (Ventana emergente de éxito) -->
+  <!-- Success Modal (Ventana emergente de éxito) -->
   <div class="custom-loader-backdrop" id="successModal" aria-hidden="true" style="z-index: 100001;">
     <div class="custom-loader-card" style="padding-bottom: 24px;">
       <div style="width: 80px; height: 80px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
@@ -268,7 +323,7 @@
     </div>
   </div>
 
-<!-- Confirm Modal (Ventana emergente de confirmación de rechazo) -->
+  <!-- Confirm Modal (Ventana emergente de confirmación de rechazo) -->
   <div class="custom-loader-backdrop" id="confirmModal" aria-hidden="true" style="z-index: 100001;">
     <div class="custom-loader-card" style="padding-bottom: 24px; min-width: 320px;">
       <div style="width: 80px; height: 80px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
@@ -283,7 +338,7 @@
         <textarea id="txtComentarioRechazo" rows="3" placeholder="Ingrese el motivo (Mínimo 5, Máximo 100 caracteres)" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: inherit; font-size: 13px; resize: none; margin-top: 5px; box-sizing: border-box;"></textarea>
       </div>
 
-<div style="display: flex; gap: 10px; width: 100%;">
+      <div style="display: flex; gap: 10px; width: 100%;">
         <button id="btnCancelarConfirm" class="btn" style="flex: 1; background: #f1f5f9; color: #475569; box-shadow: none;">Cancelar</button>
         <button id="btnAceptarConfirm" class="btn" style="flex: 1; background: #991b1b; color: #ffffff; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">Rechazar</button>
       </div>
@@ -305,7 +360,7 @@
   <!-- Toast (Alertas Profesionales) -->
   <div id="toast" class="toast"></div>
 
-<!-- LIBRERÍA DE SUPABASE -->
+  <!-- LIBRERÍA DE SUPABASE -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- LIBRERÍA EMAILJS -->

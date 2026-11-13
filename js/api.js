@@ -132,32 +132,55 @@
     }
     return 'LOT-' + String(nextNum).padStart(6, '0');
   }
-// ==========================================
+
+  // ==========================================
   // MOTOR DE CORREOS Y NOTIFICACIONES (EMAILJS)
   // ==========================================
   
-  async function obtenerCorreosNotificacion(db, emailSolicitante) {
+  async function obtenerCorreosNotificacion(db, solicitanteRef, aprobadorRef = null, incluirGerencia = false) {
     let correosDestino = [];
-    
-    // Correo del solicitante (si existe)
-    if (emailSolicitante) {
-      const { data: sol } = await db.from("PLANILLA").select("correo").eq("email", emailSolicitante).maybeSingle();
-      if (sol && sol.correo) correosDestino.push(sol.correo);
+
+    const { data: planilla, error } = await db.from("PLANILLA").select("*");
+    if (error || !planilla) {
+      console.warn("No se pudo consultar PLANILLA para correos:", error);
+      return "";
     }
-    
-    // Correos de todos los Aprobadores y Superadmin
-    const { data: aprobadores } = await db.from("PLANILLA").select("correo").in("rol", ["APROBADOR", "SUPERADMIN"]);
-    if (aprobadores) {
-      aprobadores.forEach(a => {
-        if (a.correo && !correosDestino.includes(a.correo)) correosDestino.push(a.correo);
-      });
-    }
-    
-    // Retorna una lista separada por comas, requerida por EmailJS
+
+    const norm = (val) => String(val || "").trim().toUpperCase();
+    const solKey = norm(solicitanteRef);
+    const aprKey = norm(aprobadorRef);
+
+    planilla.forEach((fila) => {
+      const correo = String(fila.correo || (String(fila.email || "").includes("@") ? fila.email : "")).trim();
+      if (!correo) return;
+
+      const emailFila = norm(fila.email);
+      const nombreFila = norm(fila.nombre);
+      const rolFila = norm(fila.rol);
+      const cargoFila = norm(fila.cargo);
+
+      // 1. Coincide con el Solicitante (por usuario/email o por nombre completo)
+      const esSolicitante = solKey && (emailFila === solKey || nombreFila === solKey);
+
+      // 2. Coincide con el Aprobador que ejecuta la acción (por usuario/email o por nombre completo)
+      const esAprobadorActual = aprKey && (emailFila === aprKey || nombreFila === aprKey);
+
+      // 3. Pertenece al grupo de Aprobadores o Superadmin
+      const esRolAprobador = ["APROBADOR", "SUPERADMIN"].includes(rolFila) || ["APROBADOR", "SUPERADMIN"].includes(cargoFila);
+
+      // 4. Pertenece al rol GERENCIA cuando la operación requiere involucrar a Gerencia
+      const esRolGerencia = incluirGerencia && (rolFila === "GERENCIA" || cargoFila === "GERENCIA");
+
+      if ((esSolicitante || esAprobadorActual || esRolAprobador || esRolGerencia) && !correosDestino.includes(correo)) {
+        correosDestino.push(correo);
+      }
+    });
+
+    console.log("Destinatarios de notificación:", correosDestino);
     return correosDestino.join(", ");
   }
 
-function generarHtmlCorreo(titulo, colorCabecera, mensajeIntro, detalles, mensajeFooter) {
+  function generarHtmlCorreo(titulo, colorCabecera, mensajeIntro, detalles, mensajeFooter) {
     // Reducimos el padding de 12px a 7px para hacer la tabla más tabulada e igual a la imagen de referencia
     const filasTabla = Object.entries(detalles).map(([llave, valor]) => `
       <tr>
@@ -209,7 +232,7 @@ function generarHtmlCorreo(titulo, colorCabecera, mensajeIntro, detalles, mensaj
     `;
   }
 
-async function enviarAlertaCorreo(destinatarios, asunto, html) {
+  async function enviarAlertaCorreo(destinatarios, asunto, html) {
     if (!window.emailjs) {
       console.warn("EmailJS no está cargado.");
       return;
@@ -240,7 +263,6 @@ async function enviarAlertaCorreo(destinatarios, asunto, html) {
     }
   }
 
-
   async function apiPost(action, payload = {}) {
     const db = getSupabaseClient();
 
@@ -263,7 +285,7 @@ async function enviarAlertaCorreo(destinatarios, asunto, html) {
             .limit(1)
             .maybeSingle();
 
-if (error) throw new Error(error.message || "Error consultando el usuario.");
+          if (error) throw new Error(error.message || "Error consultando el usuario.");
           if (!userRow) throw new Error("Usuario no encontrado.");
           if (action === "login" && String(userRow.clave) !== String(claveInput)) {
             throw new Error("Usuario o Clave incorrecta");
@@ -576,8 +598,8 @@ if (error) throw new Error(error.message || "Error consultando el usuario.");
           const { error } = await db.from("pedidos_adicionales").insert(insertData);
           if (error) throw new Error(error.message);
 
-// ENVIAR ALERTA DE CREACIÓN (AMARILLO)
-          const correos = await obtenerCorreosNotificacion(db, user.email || user.usuario);
+          // ENVIAR ALERTA DE CREACIÓN (AMARILLO)
+          const correos = await obtenerCorreosNotificacion(db, user.usuario || user.nombre);
           
           if (correos.length > 0) {
             for (const p of insertData) {
@@ -596,7 +618,7 @@ if (error) throw new Error(error.message || "Error consultando el usuario.");
               detallesHtml["Responsable"] = p.usuario_solicitante;
               detallesHtml["Fecha"] = p.fecha_registro;
 
-               const html = generarHtmlCorreo(
+              const html = generarHtmlCorreo(
                 "Solicitud Pendiente", 
                 "#eab308", 
                 "El equipo está trabajando en su solicitud activamente. A continuación, los detalles de la solicitud:", 
@@ -611,7 +633,7 @@ if (error) throw new Error(error.message || "Error consultando el usuario.");
           return { ok: true, count: insertData.length };
         }
 
-case "listPedidosAdicionales": {
+        case "listPedidosAdicionales": {
           const { data, error } = await db.from("pedidos_adicionales").select("*");
           if (error) throw new Error(error.message);
           const rows = (data || []).sort((a, b) => parseDateForSort(b.fecha_registro) - parseDateForSort(a.fecha_registro));
@@ -642,31 +664,188 @@ case "listPedidosAdicionales": {
 
           if (error) throw new Error(error.message);
 
-// ENVIAR ALERTA DE APROBACIÓN (VERDE)
+          // ENVIAR ALERTA DE APROBACIÓN (VERDE)
           const { data: pedidosAprobados } = await db.from("pedidos_adicionales").select("*").in("id_registro", payload);
           if (pedidosAprobados) {
             for (const p of pedidosAprobados) {
-              const correos = await obtenerCorreosNotificacion(db, p.usuario_solicitante);
+              const correos = await obtenerCorreosNotificacion(db, p.usuario_solicitante, aprobador);
               const detallesHtml = {
                 "ID Registro": p.id_registro,
-                "Tipo Solicitud": p.tipo_solicitud, // Se agregó el tipo de solicitud
+                "Tipo Solicitud": p.tipo_solicitud,
                 "Estatus": "Aprobado",
                 "Aprobado por": aprobador,
                 "Fecha Aprobación": nowStr
               };
-                const html = generarHtmlCorreo(
+              const html = generarHtmlCorreo(
                 "Solicitud Aprobada", 
                 "#22c55e", 
                 `Nos complace informarle que su solicitud <b>${p.id_registro}</b> ha sido <b>aprobado exitosamente</b>.`, 
                 detallesHtml, 
                 "La solicitud ha sido aprobado en el sistema."
               );
-              // Se agrega la etiqueta [EXTERNAL] y el tipo de solicitud dinámico
               await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Aprobada [${p.id_registro}]`, html);
             }
           }
 
           return { ok: true, count: payload.length };
+        }
+
+        // ==========================================
+        // 5.1 APROBACIÓN DE DESPACHOS DE URGENCIA (FLETE Y GERENCIA)
+        // ==========================================
+        case "aprobarUrgenciaDespacho": {
+          const { id_registro, modo, costo_flete, porcentaje_flete, comentario_urgencia } = payload;
+          if (!id_registro) throw new Error("ID de registro obligatorio.");
+
+          const { data: pedido, error: errGet } = await db
+            .from("pedidos_adicionales")
+            .select("*")
+            .eq("id_registro", id_registro)
+            .maybeSingle();
+
+          if (errGet || !pedido) throw new Error("No se encontró el pedido seleccionado.");
+
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const aprobador = user.nombre || user.email || "Usuario";
+          const nowStr = formatLocalNowApi();
+          const detallesActualizados = { ...(pedido.detalles || {}) };
+
+          if (modo === "APROBACION_FINAL_GERENCIA") {
+            detallesActualizados["Aprobado Gerencia Por"] = aprobador;
+            detallesActualizados["Fecha Aprobacion Gerencia"] = nowStr;
+
+            const { error: errUp } = await db
+              .from("pedidos_adicionales")
+              .update({
+                estado: "APROBADO",
+                ultima_actualizacion: nowStr,
+                fecha_aprobacion: nowStr,
+                aprobado_por: `${detallesActualizados["Evaluado Aprobador 1"] || ""} / Gerencia: ${aprobador}`.replace(/^ \/ /, ""),
+                detalles: detallesActualizados
+              })
+              .eq("id_registro", id_registro);
+
+            if (errUp) throw new Error(errUp.message);
+
+            const correos = await obtenerCorreosNotificacion(db, pedido.usuario_solicitante, aprobador, true);
+            const detallesHtml = {
+              "ID Registro": pedido.id_registro,
+              "Tipo Solicitud": `${pedido.tipo_solicitud} (URGENCIA)`,
+              "Cliente / Destino": pedido.cliente,
+              "Valor Total": detallesActualizados["Valor Total"] || detallesActualizados["Valor Venta"] || "-",
+              "Costo Flete": detallesActualizados["Costo Flete"] || "-",
+              "Costo / Valor Venta": detallesActualizados["Porcentaje Flete"] || "-",
+              "Sustento": detallesActualizados["Comentario Urgencia"] || "-",
+              "Aprobado en 2da Instancia por": `${aprobador} (GERENCIA)`,
+              "Fecha Aprobación": nowStr
+            };
+            const html = generarHtmlCorreo(
+              "Solicitud Aprobada por Gerencia",
+              "#22c55e",
+              `Nos complace informarle que la solicitud de urgencia <b>${pedido.id_registro}</b> ha sido <b>aprobada en 2da instancia por Gerencia</b>.`,
+              detallesHtml,
+              "La solicitud ha sido aprobada en el sistema."
+            );
+            await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${pedido.tipo_solicitud}" Aprobada [${pedido.id_registro}]`, html);
+            return { ok: true };
+          }
+
+          // Guardar datos registrados por Aprobador 1
+          detallesActualizados["Costo Flete"] = costo_flete;
+          detallesActualizados["Porcentaje Flete"] = porcentaje_flete;
+          if (comentario_urgencia) {
+            detallesActualizados["Comentario Urgencia"] = comentario_urgencia;
+          }
+
+          // Caso A: >= 2% (Rojo) derivado a 2da Aprobación por Gerencia
+          if (modo === "PENDIENTE_GERENCIA") {
+            detallesActualizados["Evaluado Aprobador 1"] = aprobador;
+            detallesActualizados["Fecha Evaluacion 1"] = nowStr;
+
+            const { error: errUp } = await db
+              .from("pedidos_adicionales")
+              .update({
+                estado: "PENDIENTE GERENCIA",
+                ultima_actualizacion: nowStr,
+                fecha_aprobacion: nowStr,
+                aprobado_por: aprobador,
+                detalles: detallesActualizados
+              })
+              .eq("id_registro", id_registro);
+
+            if (errUp) throw new Error(errUp.message);
+
+            // Enviar correo a GERENCIA e involucrados con el formato de solicitud pendiente de aprobación
+            const correos = await obtenerCorreosNotificacion(db, pedido.usuario_solicitante, aprobador, true);
+            const detallesHtml = {
+              "ID Registro": pedido.id_registro,
+              "Tipo Solicitud": `${pedido.tipo_solicitud} - URGENCIA`,
+              "Cliente / Destino": pedido.cliente,
+              "Pedido / OC": `${detallesActualizados["Pedido"] || "-"} / ${detallesActualizados["OC"] || "-"}`,
+              "Valor Total": detallesActualizados["Valor Total"] || detallesActualizados["Valor Venta"] || "-",
+              "Costo Flete": costo_flete,
+              "Costo / Valor Venta": `<span style="color:#ef4444; font-weight:bold;">${porcentaje_flete} (&gt;= 2%)</span>`,
+              "Comentario Aprobador 1": comentario_urgencia,
+              "Evaluado por": aprobador,
+              "Solicitante": pedido.usuario_solicitante,
+              "Fecha": nowStr
+            };
+            const html = generarHtmlCorreo(
+              "Solicitud Pendiente - 2da Aprobación Gerencia",
+              "#eab308",
+              "La siguiente solicitud de Despacho por Urgencia supera el 2% de relación Costo Flete / Valor Venta y requiere <b>segunda aprobación por parte de Gerencia</b>:",
+              detallesHtml,
+              "La solicitud se encuentra en estado PENDIENTE GERENCIA en el Sistema Logístico."
+            );
+            await enviarAlertaCorreo(correos, `Segunda Aprobación Gerencia Requerida "${pedido.tipo_solicitud}" [${pedido.id_registro}]`, html);
+            return { ok: true };
+          }
+
+          // Caso B: Aprobación Directa (< 2% en Verde o >= 2% en Rojo por Coordinación Interna Aprobador 1 y 2)
+          const esCoordinacion = modo === "COORDINACION_INTERNA";
+          detallesActualizados["Modo Aprobacion Urgencia"] = esCoordinacion ? "Coordinación Interna (Aprobador 1 y 2)" : "Regular (< 2%)";
+
+          const { error: errUp } = await db
+            .from("pedidos_adicionales")
+            .update({
+              estado: "APROBADO",
+              ultima_actualizacion: nowStr,
+              fecha_aprobacion: nowStr,
+              aprobado_por: aprobador,
+              detalles: detallesActualizados
+            })
+            .eq("id_registro", id_registro);
+
+          if (errUp) throw new Error(errUp.message);
+
+          // Si es por coordinación interna (>= 2%), incluye obligatoriamente a GERENCIA en el correo
+          const correos = await obtenerCorreosNotificacion(db, pedido.usuario_solicitante, aprobador, esCoordinacion);
+          const detallesHtml = {
+            "ID Registro": pedido.id_registro,
+            "Tipo Solicitud": `${pedido.tipo_solicitud} - URGENCIA`,
+            "Cliente / Destino": pedido.cliente,
+            "Valor Total": detallesActualizados["Valor Total"] || detallesActualizados["Valor Venta"] || "-",
+            "Costo Flete": costo_flete,
+            "Costo / Valor Venta": esCoordinacion
+              ? `<span style="color:#ef4444; font-weight:bold;">${porcentaje_flete} (Aprobado por Coordinación Interna)</span>`
+              : `<span style="color:#16a34a; font-weight:bold;">${porcentaje_flete} (&lt; 2%)</span>`,
+            "Estatus": "Aprobado",
+            "Aprobado por": aprobador,
+            "Fecha Aprobación": nowStr
+          };
+          if (esCoordinacion && comentario_urgencia) {
+            detallesHtml["Comentario Coordinación"] = comentario_urgencia;
+          }
+
+          const html = generarHtmlCorreo(
+            "Solicitud Aprobada",
+            "#22c55e",
+            `Nos complace informarle que su solicitud <b>${pedido.id_registro}</b> ha sido <b>aprobado exitosamente</b>.`,
+            detallesHtml,
+            "La solicitud ha sido aprobado en el sistema."
+          );
+          await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${pedido.tipo_solicitud}" Aprobada [${pedido.id_registro}]`, html);
+          return { ok: true };
         }
 
         // ==========================================
@@ -697,27 +876,26 @@ case "listPedidosAdicionales": {
 
           if (error) throw new Error(error.message);
 
-// ENVIAR ALERTA DE RECHAZO (ROJO CLARO)
+          // ENVIAR ALERTA DE RECHAZO (ROJO CLARO)
           const { data: pedidosRechazados } = await db.from("pedidos_adicionales").select("*").in("id_registro", idsToReject);
           if (pedidosRechazados) {
             for (const p of pedidosRechazados) {
-              const correos = await obtenerCorreosNotificacion(db, p.usuario_solicitante);
+              const correos = await obtenerCorreosNotificacion(db, p.usuario_solicitante, aprobador);
               const detallesHtml = {
                 "ID Registro": p.id_registro,
-                "Tipo Solicitud": p.tipo_solicitud, // Se agregó el tipo de solicitud
+                "Tipo Solicitud": p.tipo_solicitud,
                 "Estatus": "Rechazado",
                 "Motivo": `<span style="color:#ef4444; font-weight:bold;">${comentarioRechazo}</span>`,
                 "Rechazado por": aprobador,
                 "Fecha Rechazo": nowStr
               };
-                const html = generarHtmlCorreo(
+              const html = generarHtmlCorreo(
                 "Solicitud Rechazada", 
                 "#ef4444", 
                 `Le informamos que su solicitud <b>${p.id_registro}</b> ha sido revisado por el equipo y se ha determinado su <b>rechazo</b>.`, 
                 detallesHtml, 
                 "Si requiere más información sobre los motivos de esta decisión, por favor póngase en contacto con el equipo de operaciones."
               );
-              // Se agrega la etiqueta [EXTERNAL] y el tipo de solicitud dinámico
               await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Rechazada [${p.id_registro}]`, html);
             }
           }
