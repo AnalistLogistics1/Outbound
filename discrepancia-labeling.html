@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Discrepancia Labeling | Sistema Logístico</title>
+
+  <link rel="stylesheet" href="./part/cabecera.css">
+  <link rel="stylesheet" href="./part/footer.css">
+  <link rel="stylesheet" href="./css/discrepancia-labeling.css">
+
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#072B5C">
+  <link rel="apple-touch-icon" href="./img/logo.png">
+  <link rel="icon" type="image/png" href="./img/logo.png">
+
+  <!-- Supabase SDK + ExcelJS (Excel con fotos incrustadas) + JSZip (Paquete ZIP para Macro) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div id="contenedor-cabecera"></div>
+
+  <main class="dl-wrapper">
+    <!-- BARRA SUPERIOR ESTILO APPSHEET + CORPORATIVA -->
+    <header class="dl-topbar">
+      <div class="dl-topbar-left">
+        <a href="./Menu-Opciones/menu.html" class="dl-btn-back">← Menú</a>
+        <div class="dl-title-box">
+          <h1>DISCREPANCIA — LABELING</h1>
+          <span id="dlContadorRegistros">0 registros activos</span>
+        </div>
+      </div>
+
+      <div class="dl-search-box">
+        <input type="search" id="dlInputBuscar" placeholder="🔍 Búsqueda por SKU, Bodega o Fecha...">
+      </div>
+
+      <div class="dl-topbar-actions">
+        <button type="button" id="btnNuevoRegistro" class="dl-btn dl-btn-add">+ Añadir</button>
+        <button type="button" id="btnDescargarExcel" class="dl-btn dl-btn-excel" title="Descarga Excel .xlsx con fotos tamaño mediano y pie de página">📥 Excel con Fotos</button>
+        <button type="button" id="btnDescargarZipMacro" class="dl-btn dl-btn-zip" title="Descarga ZIP con CSV + Fotos físicas listas para Macro VBA">📦 ZIP para Macro</button>
+      </div>
+    </header>
+
+    <!-- PANEL DIVIDIDO IZQUIERDA (TABLA) / DERECHA (VISOR DETALLE + BORRAR TODO) -->
+    <section class="dl-split-layout">
+      <!-- IZQUIERDA: TABLA DE REGISTROS -->
+      <div class="dl-table-panel">
+        <div class="dl-table-scroll">
+          <table class="dl-table">
+            <thead>
+              <tr>
+                <th>Fecha Hora ↓</th>
+                <th>SKU</th>
+                <th>Bodega</th>
+                <th>Imagen 1</th>
+                <th>Imagen 2</th>
+                <th>+ Fotos</th>
+              </tr>
+            </thead>
+            <tbody id="dlTablaBody">
+              <tr>
+                <td colspan="6" class="dl-empty-msg">Cargando registros...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DERECHA: VISOR DE DETALLE (IGUAL A TU INTERFAZ APPSHEET) -->
+      <aside class="dl-detail-panel" id="dlDetailPanel">
+        <div class="dl-detail-header">
+          <strong id="detTituloFecha">Seleccione un registro</strong>
+          <div class="dl-detail-tools">
+            <button type="button" id="btnEditarActual" class="dl-btn-sm dl-btn-edit" disabled>✎ Editar</button>
+            <button type="button" id="btnEliminarFila" class="dl-btn-sm dl-btn-del-row" disabled title="Eliminar solo esta fila">🗑 Fila</button>
+          </div>
+        </div>
+
+        <div class="dl-detail-body" id="dlDetailBody">
+          <!-- Carrusel / Galería de fotos del registro seleccionado -->
+          <div class="dl-main-photo-box" id="detPhotoBox">
+            <img id="detImagenPrincipal" src="" alt="Vista previa" style="display:none;">
+            <div id="detSinFoto" class="dl-no-photo">Seleccione una fila para ver sus fotos</div>
+          </div>
+
+          <div class="dl-thumbs-strip" id="detMiniaturas"></div>
+
+          <!-- BOTÓN VERDE CIRCULAR "BORRAR TODO" (IDÉNTICO A APPSHEET + LIMPIEZA STORAGE) -->
+          <div class="dl-clear-all-zone">
+            <button type="button" id="btnBorrarTodo" class="dl-btn-clear-all">
+              <span class="dl-trash-circle">🗑️</span>
+              <span>Borrar Todo</span>
+            </button>
+          </div>
+
+          <!-- DATOS DEL REGISTRO -->
+          <div class="dl-meta-list">
+            <div class="dl-meta-item">
+              <span>Fecha Hora</span>
+              <strong id="detFechaHora">—</strong>
+            </div>
+            <div class="dl-meta-item">
+              <span>SKU</span>
+              <strong id="detSku">—</strong>
+            </div>
+            <div class="dl-meta-item">
+              <span>Bodega</span>
+              <strong id="detBodega">—</strong>
+            </div>
+            <div class="dl-meta-item">
+              <span>Registrado por</span>
+              <strong id="detUsuario">—</strong>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <!-- MODAL DE REGISTRO / EDICIÓN (COMPATIBLE CON CÁMARA NATIVA iOS Y ANDROID) -->
+  <div class="dl-modal-backdrop" id="dlModalForm" style="display:none;">
+    <div class="dl-modal">
+      <div class="dl-modal-header">
+        <h2 id="modalTitulo">Nuevo Registro Labeling</h2>
+        <button type="button" id="btnCerrarModal" class="dl-modal-close">✕</button>
+      </div>
+
+      <form id="formDiscrepancia" class="dl-modal-body">
+        <input type="hidden" id="inputIdRegistro" value="">
+
+        <div class="dl-form-group">
+          <label>Fecha y Hora (Automática)</label>
+          <input type="text" id="inputFechaHora" readonly>
+        </div>
+
+<div class="dl-form-row">
+          <div class="dl-form-group">
+            <label for="inputSku">SKU *</label>
+            <input type="text" id="inputSku" placeholder="Ej: 9959" required autocomplete="off">
+          </div>
+
+          <div class="dl-form-group">
+            <label for="inputBodega">Bodega *</label>
+            <input type="text" id="inputBodega" placeholder="Ingrese bodega" required autocomplete="off">
+          </div>
+        </div>
+
+        <!-- CAPTURA DE FOTOS NATIVA PARA iOS Y ANDROID -->
+        <div class="dl-form-group">
+          <label>Fotografías de Mercadería (1 o más fotos - Compresión automática ~45 KB)</label>
+          
+          <div class="dl-camera-buttons">
+            <!-- Botón 1: Abre directamente la cámara trasera nativa en iPhone/iPad y Android -->
+            <label class="dl-cam-btn dl-cam-native">
+              📷 Tomar Foto con Cámara
+              <input type="file" id="inputCamaraNativa" accept="image/*" capture="environment" hidden>
+            </label>
+
+            <!-- Botón 2: Permite elegir 1 o varias fotos desde la galería o PC -->
+            <label class="dl-cam-btn dl-cam-gallery">
+              🖼️ Subir de Galería / PC
+              <input type="file" id="inputGaleriaMultiple" accept="image/*" multiple hidden>
+            </label>
+          </div>
+
+          <div id="previewFotosContainer" class="dl-preview-grid"></div>
+        </div>
+
+        <div class="dl-modal-footer">
+          <button type="button" id="btnCancelarModal" class="dl-btn dl-btn-cancel">Cancelar</button>
+          <button type="submit" id="btnGuardarRegistro" class="dl-btn dl-btn-save">Guardar Registro</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./part/cabecera.js"></script>
+  <script src="./part/footer.js"></script>
+  <script src="./js/discrepancia-labeling.js"></script>
+</body>
+</html>

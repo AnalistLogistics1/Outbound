@@ -896,11 +896,132 @@
                 detallesHtml, 
                 "Si requiere más información sobre los motivos de esta decisión, por favor póngase en contacto con el equipo de operaciones."
               );
-              await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Rechazada [${p.id_registro}]`, html);
+await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Rechazada [${p.id_registro}]`, html);
             }
           }
 
           return { ok: true, count: idsToReject.length };
+        }
+
+        // ==========================================
+        // 7. MÓDULO DISCREPANCIA LABELING (FOTOS + AUTOELIMINACIÓN)
+        // ==========================================
+        case "listDiscrepancias": {
+          const { data, error } = await db
+            .from("discrepancias_labeling")
+            .select("*");
+          if (error) throw new Error(error.message);
+
+          const rows = (data || []).sort(
+            (a, b) => parseDateForSort(b.fecha_hora) - parseDateForSort(a.fecha_hora)
+          );
+          return { ok: true, rows };
+        }
+
+        case "saveDiscrepancia": {
+          const { id_registro, fecha_hora, sku, bodega, fotos } = payload;
+          if (!sku) throw new Error("El campo SKU es obligatorio.");
+          if (!bodega) throw new Error("El campo Bodega es obligatorio.");
+
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const nowStr = formatLocalNowApi();
+
+          // Si viene id_registro existente, actualiza la fila
+          if (id_registro) {
+            const { error: upErr } = await db
+              .from("discrepancias_labeling")
+              .update({
+                sku: textValue(sku),
+                bodega: textValue(bodega),
+                fotos: Array.isArray(fotos) ? fotos : [],
+                ultima_actualizacion: nowStr
+              })
+              .eq("id_registro", id_registro);
+
+            if (upErr) throw new Error(upErr.message);
+            return { ok: true, id_registro, fecha_hora };
+          }
+
+          // Nuevo registro
+          const newId = "DSC-" + String(Date.now()).slice(-6);
+          const fechaFinal = fecha_hora || nowStr;
+
+          const insertData = {
+            id_registro: newId,
+            fecha_hora: fechaFinal,
+            sku: textValue(sku),
+            bodega: textValue(bodega),
+            fotos: Array.isArray(fotos) ? fotos : [],
+            usuario_login: user.email || user.usuario || "",
+            nombre_usuario: user.nombre || "Usuario",
+            ultima_actualizacion: nowStr
+          };
+
+          const { error: insErr } = await db
+            .from("discrepancias_labeling")
+            .insert([insertData]);
+
+          if (insErr) throw new Error(insErr.message);
+          return { ok: true, id_registro: newId, fecha_hora: fechaFinal };
+        }
+
+        case "deleteDiscrepanciaRow": {
+          const { id_registro } = payload;
+          if (!id_registro) throw new Error("ID de registro requerido.");
+
+          // 1. Obtener rutas de fotos en Storage para autoeliminarlas y liberar espacio
+          const { data: row } = await db
+            .from("discrepancias_labeling")
+            .select("fotos")
+            .eq("id_registro", id_registro)
+            .maybeSingle();
+
+          if (row && Array.isArray(row.fotos)) {
+            const paths = row.fotos.map((f) => f.path).filter(Boolean);
+            if (paths.length > 0) {
+              await db.storage.from("fotos-labeling").remove(paths);
+            }
+          }
+
+          // 2. Eliminar registro de la base de datos
+          const { error } = await db
+            .from("discrepancias_labeling")
+            .delete()
+            .eq("id_registro", id_registro);
+
+          if (error) throw new Error(error.message);
+          return { ok: true };
+        }
+
+        case "clearAllDiscrepancias": {
+          // 1. Recuperar todas las fotos registradas para vaciar el Bucket de Storage
+          const { data: allRows, error: errFetch } = await db
+            .from("discrepancias_labeling")
+            .select("id_registro, fotos");
+
+          if (errFetch) throw new Error(errFetch.message);
+
+          const allPaths = [];
+          (allRows || []).forEach((r) => {
+            if (Array.isArray(r.fotos)) {
+              r.fotos.forEach((f) => {
+                if (f && f.path) allPaths.push(f.path);
+              });
+            }
+          });
+
+          if (allPaths.length > 0) {
+            await db.storage.from("fotos-labeling").remove(allPaths);
+          }
+
+          // 2. Vaciar toda la tabla
+          const { error: errDel } = await db
+            .from("discrepancias_labeling")
+            .delete()
+            .neq("id", 0);
+
+          if (errDel) throw new Error(errDel.message);
+          return { ok: true, deletedImages: allPaths.length };
         }
 
         default:
@@ -918,4 +1039,5 @@
 
   window.apiPost = apiPost;
   window.apiGet = apiGet;
+  window.getSupabaseClient = getSupabaseClient;
 })();

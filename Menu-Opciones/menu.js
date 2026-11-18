@@ -95,6 +95,17 @@ const apps = [
       fallback: createThumb("PA", "#0f4c81", "#38bdf8", "Pedidos Adicionales"),
       icon: "PA",
       url: "../pedidos-adicionales.html"
+    },
+    {
+      id: "DL",
+      title: "Discrepancia Labeling",
+      desc: "Registro fotográfico de discrepancias por SKU y bodega.",
+      pill: "Módulo activo",
+      accent: "accent-blue",
+      image: resolveAsset("../img/discrepancia.jpg"),
+      fallback: createThumb("DL", "#072B5C", "#f59e0b", "Discrepancias"),
+      icon: "DL",
+      url: "../discrepancia-labeling.html"
     }
   ];
 

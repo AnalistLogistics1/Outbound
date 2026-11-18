@@ -391,14 +391,12 @@ body {
 .apps-grid {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  gap: 16px; /* Reducido de 22px para dar espacio a la 5ta tarjeta */
-  flex-wrap: wrap; /* Activado para que baje a la siguiente línea en pantallas pequeñas */
+  align-items: stretch;
+  gap: 14px; /* Ajustado para que entren 6 tarjetas en una fila */
+  flex-wrap: wrap;
   width: 100%;
   margin-top: 12px;
 }
-
-
 
 .app-card {
   display: flex;
@@ -412,7 +410,7 @@ body {
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
   transition: all 0.25s ease;
-  width: 216px; /* Reducido de 255px para que entren 5 en escritorio */
+  width: 180px; /* Ajustado de 216px a 180px para 6 módulos en escritorio */
   margin: 0;
 }
 
