@@ -1413,7 +1413,7 @@ if (targetName === "CapturaFotos") {
     celdaL8.textContent = fechaHoyDDMMYYYY();
     celdaB7.textContent = filas[0].col_p_tipo_medico || "";
 
-    tplBody.innerHTML = "";
+tplBody.innerHTML = "";
     filas.forEach((reg, idx) => {
       const itemNro = idx + 1;
       const esPrio = setPrio.has(String(reg.col_g_sku || "").trim().toUpperCase());
@@ -1421,13 +1421,7 @@ if (targetName === "CapturaFotos") {
       tr.innerHTML = `
         <td class="m3m-item-cell">${itemNro}</td>
         <td>${reg.col_e_embarque}</td>
-        <td>
-          <button type="button" class="m3m-sku-btn ${
-            esPrio ? "m3m-sku-prio" : ""
-          }" title="Tomar o agregar foto para ITEM #${itemNro}">
-            <span class="m3m-sku-cam-icon">📷</span> <span>${reg.col_g_sku}</span>
-          </button>
-        </td>
+        <td class="m3m-sku-cell ${esPrio ? "m3m-sku-prio" : ""}">${reg.col_g_sku}</td>
         <td>${reg.col_h_descripcion}</td>
         <td>${reg.col_i_um}</td>
         <td>${reg.col_j_stock}</td>
@@ -1437,10 +1431,6 @@ if (targetName === "CapturaFotos") {
         <td>${reg.col_l_cod_discrepancia}</td>
         <td colspan="2">${reg.col_m_desc_problema}</td>
       `;
-
-      tr.querySelector(".m3m-sku-btn").addEventListener("click", () => {
-        abrirModalCapturaSku(nombreHoja, itemNro, reg.col_g_sku);
-      });
 
       tplBody.appendChild(tr);
     });
@@ -1517,25 +1507,157 @@ if (targetName === "CapturaFotos") {
     }
   }
 
-  function renderizarHojasMaestras() {
+function renderizarHojasMaestras() {
+    const countMed = document.getElementById("countMedicos");
+    if (countMed) countMed.textContent = listaMedicosSinRsRows.length;
+
+    const countPrio = document.getElementById("countPriorizados");
+    if (countPrio) countPrio.textContent = listaPriorizados.length;
+
     const tbodyMed = document.getElementById("tbodyMedicos");
     if (tbodyMed) {
-      tbodyMed.innerHTML = listaMedicosSinRsRows
-        .map(
-          (m) =>
-            `<tr><td><b>${m.sku}</b></td><td>${m.descripcion}</td><td>${m.um}</td></tr>`
-        )
-        .join("");
+      tbodyMed.innerHTML = listaMedicosSinRsRows.length
+        ? listaMedicosSinRsRows
+            .map(
+              (m) =>
+                `<tr><td><b>${m.sku}</b></td><td>${m.descripcion}</td><td>${m.um}</td></tr>`
+            )
+            .join("")
+        : `<tr><td colspan="3" class="m3m-empty">Tabla vacía en Supabase. Use "⬆️ Cargar BD.xlsx a Supabase".</td></tr>`;
     }
+
     const tbodyPrio = document.getElementById("tbodyPriorizados");
     if (tbodyPrio) {
-      tbodyPrio.innerHTML = listaPriorizados
-        .map(
-          (p) =>
-            `<tr><td><b>${p.id_3m}</b></td><td>${p.description}</td><td>${p.pmunit}</td><td>${p.observacion}</td></tr>`
-        )
-        .join("");
+      tbodyPrio.innerHTML = listaPriorizados.length
+        ? listaPriorizados
+            .map(
+              (p) =>
+                `<tr><td><b>${p.id_3m}</b></td><td>${p.description}</td><td>${p.pmunit}</td><td>${p.observacion}</td></tr>`
+            )
+            .join("")
+        : `<tr><td colspan="4" class="m3m-empty">Tabla vacía en Supabase. Use "⬆️ Cargar BD.xlsx a Supabase".</td></tr>`;
     }
+  }
+
+  // CARGADOR DIRECTO DE BD.xlsx (PRIORIZADOS + MEDICOS SIN RS + DB) HACIA SUPABASE
+  const inputCargarBDMaestros = document.getElementById("inputCargarBDMaestros");
+  if (inputCargarBDMaestros) {
+    inputCargarBDMaestros.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      inputCargarBDMaestros.value = "";
+      if (!file) return;
+
+      const limpiarTxt = (v) => String(v ?? "").replace(/\u00A0/g, " ").trim();
+
+      try {
+        mostrarCargando("Leyendo BD.xlsx...", "Extrayendo PRIORIZADOS, MEDICOS SIN RS y DB...");
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array", cellText: true, cellDates: false });
+
+        // 1. Hoja PRIORIZADOS (deduplicando por ID_3M)
+        const priorizados = [];
+        const vistosPrio = new Set();
+        if (wb.Sheets["PRIORIZADOS"]) {
+          const rowsP = XLSX.utils.sheet_to_json(wb.Sheets["PRIORIZADOS"], { header: 1, raw: false, defval: "" });
+          for (let i = 1; i < rowsP.length; i++) {
+            const id3m = limpiarTxt(rowsP[i][0]).toUpperCase();
+            if (!id3m || vistosPrio.has(id3m)) continue;
+            vistosPrio.add(id3m);
+            priorizados.push({
+              id_3m: id3m,
+              description: limpiarTxt(rowsP[i][1]),
+              pmunit: limpiarTxt(rowsP[i][2]),
+              observacion: limpiarTxt(rowsP[i][3])
+            });
+          }
+        }
+
+        // 2. Hoja MEDICOS SIN RS (deduplicando HB00483229 repetido en filas 11 y 23)
+        const medicosSinRs = [];
+        const vistosMed = new Set();
+        if (wb.Sheets["MEDICOS SIN RS"]) {
+          const rowsM = XLSX.utils.sheet_to_json(wb.Sheets["MEDICOS SIN RS"], { header: 1, raw: false, defval: "" });
+          for (let i = 1; i < rowsM.length; i++) {
+            const sku = limpiarTxt(rowsM[i][0]).toUpperCase();
+            if (!sku || vistosMed.has(sku)) continue;
+            vistosMed.add(sku);
+            medicosSinRs.push({
+              sku,
+              descripcion: limpiarTxt(rowsM[i][1]),
+              um: limpiarTxt(rowsM[i][2])
+            });
+          }
+        }
+
+        // 3. Hoja DB (Col B: NO MEDICO y Col C: MEDICO SIN RS)
+        const dbRows = [];
+        if (wb.Sheets["DB"]) {
+          const rowsD = XLSX.utils.sheet_to_json(wb.Sheets["DB"], { header: 1, raw: false, defval: "" });
+          for (let i = 1; i < rowsD.length; i++) {
+            const valB = limpiarTxt(rowsD[i][1]);
+            const valC = limpiarTxt(rowsD[i][2]);
+            if (valB) {
+              dbRows.push({
+                tipo_columna: "B",
+                correlativo: parseInt(valB.slice(0, 4), 10) || 0,
+                valor_reporte: valB,
+                reemplazado_1111: valB.toUpperCase().includes("COSTO 1111")
+              });
+            }
+            if (valC) {
+              dbRows.push({
+                tipo_columna: "C",
+                correlativo: parseInt(valC.slice(0, 4), 10) || 0,
+                valor_reporte: valC,
+                reemplazado_1111: valC.toUpperCase().includes("COSTO 1111")
+              });
+            }
+          }
+        }
+
+        if (priorizados.length === 0 && medicosSinRs.length === 0) {
+          return mostrarErrorEstado(
+            "Hojas no encontradas",
+            "El archivo debe contener las hojas 'PRIORIZADOS' y/o 'MEDICOS SIN RS'."
+          );
+        }
+
+        let incluirDB = false;
+        if (dbRows.length > 0) {
+          incluirDB = await mostrarConfirmacionConLogo(
+            "¿Sincronizar también la hoja DB?",
+            `Se encontraron ${priorizados.length} PRIORIZADOS, ${medicosSinRs.length} MEDICOS SIN RS y ${dbRows.length} correlativos en DB.\n¿Deseas reemplazar también la tabla DB en Supabase para continuar desde el último correlativo real?`,
+            "Sí, subir todo"
+          );
+        }
+
+        mostrarCargando("Subiendo a Supabase...", "Guardando tablas maestras en la base de datos...");
+        const res = await window.apiPost("sincronizarMaestrosBD", {
+          priorizados,
+          medicosSinRs,
+          dbRows,
+          incluirDB
+        });
+        if (!res.ok) throw new Error(res.message);
+
+        await cargarMaestrosDesdeSupabase();
+        await cargarEstadoDesdeSupabase();
+
+        // Si estaba en una hoja generada, refrescar para ver los SKUs priorizados en amarillo
+        const hojas = obtenerNombresHojasGeneradas();
+        if (hojas.includes(pestanaActiva)) {
+          renderizarVistaPlantilla(pestanaActiva);
+        }
+
+        mostrarCompletado(
+          "Maestros Cargados en Supabase",
+          `PRIORIZADOS: ${res.priorizados} filas\nMEDICOS SIN RS: ${res.medicosSinRs} SKUs únicos` +
+            (incluirDB ? `\nDB Correlativos: ${res.dbRows} registros` : "")
+        );
+      } catch (err) {
+        mostrarErrorEstado("Error cargando BD.xlsx", err.message);
+      }
+    });
   }
 
 // =========================================================================

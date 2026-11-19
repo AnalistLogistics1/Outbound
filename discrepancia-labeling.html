@@ -243,7 +243,7 @@
                 <tr>
                   <th style="width:5%">ITEM</th>
                   <th style="width:11%">Embarque</th>
-                  <th style="width:10%">SKU <small>(📷)</small></th>
+                  <th style="width:10%">SKU</th>
                   <th style="width:19%">Descripción</th>
                   <th style="width:5%">UM</th>
                   <th style="width:6%">Cantidad</th>
@@ -262,7 +262,7 @@
           <div class="m3m-photos-section" id="tplZonaFotos">
             <div class="m3m-photos-header">
               <span>📸 Evidencias Fotográficas — Hoja: <strong id="tplNombreHojaActual">Plantilla</strong></span>
-              <small>Toca cualquier <b>SKU</b> de la tabla para tomar o subir foto (se comprime automáticamente en KB).</small>
+              <small class="m3m-photos-hint">Evidencias vinculadas por <b>Consolidado Final</b> (use <b>Editar</b> para trazar flecha roja).</small>
             </div>
             <div class="m3m-photos-grid" id="tplFotosGrid"></div>
           </div>
@@ -291,7 +291,10 @@
 
       <!-- 4. HOJA MEDICOS SIN RS -->
       <div class="m3m-sheet-pane" id="pane-MEDICOS">
-        <div class="m3m-pane-toolbar"><strong>Hoja Base: MEDICOS SIN RS</strong></div>
+        <div class="m3m-pane-toolbar">
+          <strong>Hoja Base: MEDICOS SIN RS (<span id="countMedicos">0</span> SKUs)</strong>
+          <label class="m3m-btn-upload-bd" for="inputCargarBDMaestros">⬆️ Cargar BD.xlsx a Supabase</label>
+        </div>
         <div class="m3m-table-scroll">
           <table class="m3m-grid-table">
             <thead>
@@ -308,7 +311,13 @@
 
       <!-- 5. HOJA PRIORIZADOS -->
       <div class="m3m-sheet-pane" id="pane-PRIORIZADOS">
-        <div class="m3m-pane-toolbar"><strong>Hoja Base: PRIORIZADOS</strong></div>
+        <div class="m3m-pane-toolbar">
+          <strong>Hoja Base: PRIORIZADOS (<span id="countPriorizados">0</span> SKUs)</strong>
+          <label class="m3m-btn-upload-bd">
+            ⬆️ Cargar BD.xlsx a Supabase (Priorizados + Médicos + DB)
+            <input type="file" id="inputCargarBDMaestros" accept=".xlsx,.xls" hidden>
+          </label>
+        </div>
         <div class="m3m-table-scroll">
           <table class="m3m-grid-table">
             <thead>

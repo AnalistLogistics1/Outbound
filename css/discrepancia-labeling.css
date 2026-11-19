@@ -347,30 +347,33 @@ body {
   background: #f8fafc;
 }
 
-/* CUADRO / BOTÓN SKU PARA TOMAR FOTO */
-.m3m-sku-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 100%;
-  padding: 5px 6px;
-  border: 1.5px solid #0f4c81;
-  border-radius: 5px;
-  background: #eff6ff;
-  color: #072B5C;
-  font-weight: 800;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.m3m-sku-btn:hover {
-  background: #dbeafe;
+/* CELDA SKU PLANA (SIN BOTÓN) + RESALTADO AMARILLO RGB(255, 242, 204) PARA PRIORIZADOS */
+.m3m-sku-cell {
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .m3m-sku-prio {
   background-color: var(--m3m-prio-yellow) !important;
-  border-color: #d97706 !important;
+  color: #000000 !important;
+  font-weight: 800;
+}
+
+.m3m-btn-upload-bd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #072B5C;
+  color: #ffffff !important;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.m3m-btn-upload-bd:hover {
+  background: #0f4c81;
 }
 
 /* GRILLA DE FOTOS DEBAJO DE LA TABLA CON ITEM ENCIMA */

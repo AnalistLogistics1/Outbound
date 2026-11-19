@@ -1028,11 +1028,63 @@ await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Re
         // MÓDULO MACRO 3M DISCREPANCIA LABELING
         // ==========================================
         case "getMaestrosLabeling": {
-          const { data: prioData, error: errPrio } = await db.from("maestros_priorizados").select("*");
+          const { data: prioData, error: errPrio } = await db
+            .from("maestros_priorizados")
+            .select("*")
+            .range(0, 2999);
           if (errPrio) throw new Error(errPrio.message);
-          const { data: medData, error: errMed } = await db.from("maestros_medicos_sin_rs").select("*");
+
+          const { data: medData, error: errMed } = await db
+            .from("maestros_medicos_sin_rs")
+            .select("*")
+            .range(0, 999);
           if (errMed) throw new Error(errMed.message);
+
           return { ok: true, priorizados: prioData || [], medicosSinRs: medData || [] };
+        }
+
+        case "sincronizarMaestrosBD": {
+          const { priorizados, medicosSinRs, dbRows, incluirDB } = payload;
+
+          // 1. Reemplazar PRIORIZADOS en lotes de 200 filas
+          if (Array.isArray(priorizados) && priorizados.length > 0) {
+            const { error: delP } = await db.from("maestros_priorizados").delete().neq("id", 0);
+            if (delP) throw new Error("Error limpiando maestros_priorizados: " + delP.message);
+
+            for (let i = 0; i < priorizados.length; i += 200) {
+              const lote = priorizados.slice(i, i + 200);
+              const { error: insP } = await db.from("maestros_priorizados").insert(lote);
+              if (insP) throw new Error("Error insertando maestros_priorizados: " + insP.message);
+            }
+          }
+
+          // 2. Reemplazar MEDICOS SIN RS (ya deduplicado)
+          if (Array.isArray(medicosSinRs) && medicosSinRs.length > 0) {
+            const { error: delM } = await db.from("maestros_medicos_sin_rs").delete().neq("id", 0);
+            if (delM) throw new Error("Error limpiando maestros_medicos_sin_rs: " + delM.message);
+
+            const { error: insM } = await db.from("maestros_medicos_sin_rs").insert(medicosSinRs);
+            if (insM) throw new Error("Error insertando maestros_medicos_sin_rs: " + insM.message);
+          }
+
+          // 3. Opcional: Sincronizar hoja DB (correlativos históricos)
+          if (incluirDB && Array.isArray(dbRows) && dbRows.length > 0) {
+            const { error: delD } = await db.from("labeling_db").delete().neq("id", 0);
+            if (delD) throw new Error("Error limpiando labeling_db: " + delD.message);
+
+            for (let i = 0; i < dbRows.length; i += 200) {
+              const lote = dbRows.slice(i, i + 200);
+              const { error: insD } = await db.from("labeling_db").insert(lote);
+              if (insD) throw new Error("Error insertando labeling_db: " + insD.message);
+            }
+          }
+
+          return {
+            ok: true,
+            priorizados: (priorizados || []).length,
+            medicosSinRs: (medicosSinRs || []).length,
+            dbRows: incluirDB ? (dbRows || []).length : 0
+          };
         }
 
         case "getMacroLabelingState": {
