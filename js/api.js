@@ -1151,7 +1151,12 @@ await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Re
               .eq("id", id)
               .maybeSingle();
 
-            if (prev?.foto_path && prev.foto_path !== foto_path) {
+            // Solo borrar del bucket fotos-labeling-hojas si no es referencia directa de captura
+            if (
+              prev?.foto_path &&
+              !String(prev.foto_path).startsWith("captura::") &&
+              prev.foto_path !== foto_path
+            ) {
               await db.storage.from("fotos-labeling-hojas").remove([prev.foto_path]);
             }
 
@@ -1192,7 +1197,7 @@ await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Re
             .eq("id", id)
             .maybeSingle();
 
-          if (row?.foto_path) {
+          if (row?.foto_path && !String(row.foto_path).startsWith("captura::")) {
             await db.storage.from("fotos-labeling-hojas").remove([row.foto_path]);
           }
 
@@ -1201,19 +1206,60 @@ await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Re
           return { ok: true };
         }
 
-        case "resetProcesoYStorageLabeling": {
-          // 1. Borrar todas las fotos del bucket para liberar espacio en el plan Free
-          const { data: fotosRows } = await db.from("labeling_fotos").select("foto_path");
-          const paths = (fotosRows || []).map((f) => f.foto_path).filter(Boolean);
-          if (paths.length > 0) {
-            await db.storage.from("fotos-labeling-hojas").remove(paths);
+        case "consolidarFotosLabeling": {
+          const { registrosFotos } = payload;
+          if (!Array.isArray(registrosFotos)) {
+            throw new Error("Lista de fotos a consolidar inválida.");
           }
 
-          // 2. Vaciar fotos, registros y pestañas generadas
+          // 1. Limpiar consolidados previos (prefijo captura::) sin borrar ediciones manuales con flecha roja
+          await db
+            .from("labeling_fotos")
+            .delete()
+            .like("foto_path", "captura::%");
+
+          // 2. Insertar el nuevo consolidado ordenado por hoja e ITEM
+          if (registrosFotos.length > 0) {
+            const { error: insErr } = await db
+              .from("labeling_fotos")
+              .insert(registrosFotos);
+            if (insErr) throw new Error(insErr.message);
+          }
+
+          return { ok: true, insertadas: registrosFotos.length };
+        }
+
+        case "resetProcesoYStorageLabeling": {
+          // 1. Borrar fotos editadas/manuales del bucket fotos-labeling-hojas
+          const { data: fotosRows } = await db.from("labeling_fotos").select("foto_path");
+          const pathsHojas = (fotosRows || [])
+            .map((f) => f.foto_path)
+            .filter((p) => p && !String(p).startsWith("captura::"));
+
+          if (pathsHojas.length > 0) {
+            await db.storage.from("fotos-labeling-hojas").remove(pathsHojas);
+          }
+
+          // 2. Borrar fotos originales del bucket fotos-labeling (Captura previa)
+          const { data: capRows } = await db.from("discrepancias_labeling").select("fotos");
+          const pathsCaptura = [];
+          (capRows || []).forEach((r) => {
+            if (Array.isArray(r.fotos)) {
+              r.fotos.forEach((f) => {
+                if (f && f.path) pathsCaptura.push(f.path);
+              });
+            }
+          });
+          if (pathsCaptura.length > 0) {
+            await db.storage.from("fotos-labeling").remove(pathsCaptura);
+          }
+
+          // 3. Vaciar tablas operativas (no toca DB de correlativos ni Maestros)
           await db.from("labeling_fotos").delete().neq("id", 0);
           await db.from("labeling_registros").delete().neq("id", 0);
+          await db.from("discrepancias_labeling").delete().neq("id", 0);
 
-          return { ok: true, deletedFotos: paths.length };
+          return { ok: true, deletedFotos: pathsHojas.length + pathsCaptura.length };
         }
 
         default:

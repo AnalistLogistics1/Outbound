@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let trazoActual = null;
   let dibujandoFlecha = false;
 
+const btnAbrirCapturaFotos = document.getElementById("btnAbrirCapturaFotos");
+  const btnConsolidadoFinal = document.getElementById("btnConsolidadoFinal");
   const inputExcelOrigen = document.getElementById("inputExcelOrigen");
   const btnGenerarNroReporte = document.getElementById("btnGenerarNroReporte");
   const btnGenerarPlantillas = document.getElementById("btnGenerarPlantillas");
@@ -220,7 +222,10 @@ document.addEventListener("DOMContentLoaded", () => {
       p.classList.remove("active");
     });
 
-    if (targetName === "Registros") {
+if (targetName === "CapturaFotos") {
+      document.getElementById("pane-CapturaFotos").classList.add("active");
+      await cargarRegistrosCapturaPrevia();
+    } else if (targetName === "Registros") {
       document.getElementById("pane-Registros").classList.add("active");
     } else if (targetName === "DB") {
       document.getElementById("pane-DB").classList.add("active");
@@ -1531,6 +1536,462 @@ document.addEventListener("DOMContentLoaded", () => {
         )
         .join("");
     }
+  }
+
+// =========================================================================
+  // 11. MÓDULO PREVIO: CAPTURA DE IMÁGENES (INTERFAZ VERDE -> discrepancias_labeling)
+  // =========================================================================
+  let registrosCaptura = [];
+  let capturaSeleccionada = null;
+  let fotosModalCaptura = []; // [{ url, path, blob, sizeKb, isNew }]
+
+  const dlTablaBody = document.getElementById("dlTablaBody");
+  const dlContadorRegistros = document.getElementById("dlContadorRegistros");
+  const dlInputBuscar = document.getElementById("dlInputBuscar");
+  const detTituloFecha = document.getElementById("detTituloFecha");
+  const detImagenPrincipal = document.getElementById("detImagenPrincipal");
+  const detSinFoto = document.getElementById("detSinFoto");
+  const detMiniaturas = document.getElementById("detMiniaturas");
+  const detFechaHora = document.getElementById("detFechaHora");
+  const detSku = document.getElementById("detSku");
+  const detBodega = document.getElementById("detBodega");
+  const detUsuario = document.getElementById("detUsuario");
+  const btnEditarActualCap = document.getElementById("btnEditarActualCap");
+  const btnEliminarFilaCap = document.getElementById("btnEliminarFilaCap");
+  const btnBorrarTodoCap = document.getElementById("btnBorrarTodoCap");
+
+  const dlModalForm = document.getElementById("dlModalForm");
+  const dlModalTitulo = document.getElementById("dlModalTitulo");
+  const formCapturaPrevia = document.getElementById("formCapturaPrevia");
+  const dlInputIdRegistro = document.getElementById("dlInputIdRegistro");
+  const dlInputFechaHora = document.getElementById("dlInputFechaHora");
+  const dlInputSku = document.getElementById("dlInputSku");
+  const dlInputBodega = document.getElementById("dlInputBodega");
+  const dlInputCamaraNativa = document.getElementById("dlInputCamaraNativa");
+  const dlInputGaleriaMultiple = document.getElementById("dlInputGaleriaMultiple");
+  const dlPreviewFotosContainer = document.getElementById("dlPreviewFotosContainer");
+
+  function obtenerFechaHoraActualCap() {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mi = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+  }
+
+  if (btnAbrirCapturaFotos) {
+    btnAbrirCapturaFotos.addEventListener("click", () => activarPestana("CapturaFotos"));
+  }
+
+  document.getElementById("btnVolverDeCaptura").addEventListener("click", () => {
+    const hojas = obtenerNombresHojasGeneradas();
+    activarPestana(hojas.length > 0 ? hojas[0] : "Registros");
+  });
+
+  async function cargarRegistrosCapturaPrevia() {
+    const res = await window.apiPost("listDiscrepancias");
+    if (!res.ok) {
+      dlTablaBody.innerHTML = `<tr><td colspan="6" class="dl-empty-msg">Error: ${res.message}</td></tr>`;
+      return;
+    }
+    registrosCaptura = res.rows || [];
+    dlContadorRegistros.textContent = `${registrosCaptura.length} registro${
+      registrosCaptura.length === 1 ? "" : "s"
+    } capturado${registrosCaptura.length === 1 ? "" : "s"}`;
+
+    renderizarTablaCaptura();
+    if (registrosCaptura.length > 0) {
+      seleccionarCaptura(registrosCaptura[0]);
+    } else {
+      limpiarDetalleCaptura();
+    }
+  }
+
+  function renderizarTablaCaptura() {
+    const filtro = (dlInputBuscar.value || "").trim().toLowerCase();
+    const filtrados = registrosCaptura.filter(
+      (r) =>
+        String(r.sku || "").toLowerCase().includes(filtro) ||
+        String(r.bodega || "").toLowerCase().includes(filtro) ||
+        String(r.fecha_hora || "").toLowerCase().includes(filtro)
+    );
+
+    if (filtrados.length === 0) {
+      dlTablaBody.innerHTML = `<tr><td colspan="6" class="dl-empty-msg">Sin capturas registradas. Pulse "+ Añadir" para tomar fotos.</td></tr>`;
+      return;
+    }
+
+    dlTablaBody.innerHTML = "";
+    filtrados.forEach((item) => {
+      const fotos = Array.isArray(item.fotos) ? item.fotos : [];
+      const img1 = fotos[0] ? `<img src="${fotos[0].url}" class="dl-thumb-cell" alt="Img1">` : "—";
+      const img2 = fotos[1] ? `<img src="${fotos[1].url}" class="dl-thumb-cell" alt="Img2">` : "—";
+      const extra = fotos.length > 2 ? `<span class="dl-badge-more">+${fotos.length - 2}</span>` : "";
+
+      const tr = document.createElement("tr");
+      if (capturaSeleccionada && capturaSeleccionada.id_registro === item.id_registro) {
+        tr.classList.add("is-selected");
+      }
+      tr.innerHTML = `
+        <td>${item.fecha_hora}</td>
+        <td><strong>${item.sku}</strong></td>
+        <td><strong>${item.bodega}</strong></td>
+        <td>${img1}</td>
+        <td>${img2}</td>
+        <td>${extra}</td>
+      `;
+      tr.addEventListener("click", () => seleccionarCaptura(item));
+      dlTablaBody.appendChild(tr);
+    });
+  }
+
+  function seleccionarCaptura(item) {
+    capturaSeleccionada = item;
+    renderizarTablaCaptura();
+
+    detTituloFecha.textContent = item.fecha_hora;
+    detFechaHora.textContent = item.fecha_hora;
+    detSku.textContent = item.sku;
+    detBodega.textContent = item.bodega;
+    detUsuario.textContent = item.nombre_usuario || "Usuario";
+    btnEditarActualCap.disabled = false;
+    btnEliminarFilaCap.disabled = false;
+
+    const fotos = Array.isArray(item.fotos) ? item.fotos : [];
+    detMiniaturas.innerHTML = "";
+
+    if (fotos.length === 0) {
+      detImagenPrincipal.style.display = "none";
+      detSinFoto.style.display = "block";
+      detSinFoto.textContent = "Este registro no tiene fotografías.";
+      return;
+    }
+
+    detSinFoto.style.display = "none";
+    detImagenPrincipal.style.display = "block";
+    detImagenPrincipal.src = fotos[0].url;
+
+    fotos.forEach((f, idx) => {
+      const thumb = document.createElement("img");
+      thumb.src = f.url;
+      if (idx === 0) thumb.classList.add("active");
+      thumb.addEventListener("click", () => {
+        detImagenPrincipal.src = f.url;
+        detMiniaturas.querySelectorAll("img").forEach((el) => el.classList.remove("active"));
+        thumb.classList.add("active");
+      });
+      detMiniaturas.appendChild(thumb);
+    });
+  }
+
+  function limpiarDetalleCaptura() {
+    capturaSeleccionada = null;
+    detTituloFecha.textContent = "Seleccione un registro";
+    detFechaHora.textContent = "—";
+    detSku.textContent = "—";
+    detBodega.textContent = "—";
+    detUsuario.textContent = "—";
+    detImagenPrincipal.style.display = "none";
+    detSinFoto.style.display = "block";
+    detSinFoto.textContent = "Seleccione una fila para ver sus fotos";
+    detMiniaturas.innerHTML = "";
+    btnEditarActualCap.disabled = true;
+    btnEliminarFilaCap.disabled = true;
+  }
+
+  dlInputBuscar.addEventListener("input", renderizarTablaCaptura);
+
+  function renderizarPreviewsDlModal() {
+    dlPreviewFotosContainer.innerHTML = "";
+    fotosModalCaptura.forEach((foto, idx) => {
+      const card = document.createElement("div");
+      card.className = "dl-preview-card";
+      card.innerHTML = `
+        <img src="${foto.url}" alt="Foto ${idx + 1}">
+        <button type="button" class="dl-preview-remove">✕</button>
+        <span class="dl-preview-size">${foto.sizeKb ? foto.sizeKb + " KB" : "Guardada"}</span>
+      `;
+      card.querySelector(".dl-preview-remove").addEventListener("click", () => {
+        fotosModalCaptura.splice(idx, 1);
+        renderizarPreviewsDlModal();
+      });
+      dlPreviewFotosContainer.appendChild(card);
+    });
+  }
+
+  async function agregarArchivosModalCaptura(fileList) {
+    if (!fileList || fileList.length === 0) return;
+    for (const file of Array.from(fileList)) {
+      try {
+        const { blob } = await comprimirImagenEnKb(file, 900, 0.72);
+        fotosModalCaptura.push({
+          url: URL.createObjectURL(blob),
+          path: null,
+          blob,
+          sizeKb: Math.round(blob.size / 1024),
+          isNew: true
+        });
+      } catch (err) {
+        mostrarErrorEstado("Error de imagen", err.message);
+      }
+    }
+    renderizarPreviewsDlModal();
+  }
+
+  dlInputCamaraNativa.addEventListener("change", async (e) => {
+    await agregarArchivosModalCaptura(e.target.files);
+    dlInputCamaraNativa.value = "";
+  });
+
+  dlInputGaleriaMultiple.addEventListener("change", async (e) => {
+    await agregarArchivosModalCaptura(e.target.files);
+    dlInputGaleriaMultiple.value = "";
+  });
+
+  document.getElementById("btnNuevoRegistroCaptura").addEventListener("click", () => {
+    dlModalTitulo.textContent = "Añadir Registro de Fotos";
+    dlInputIdRegistro.value = "";
+    dlInputFechaHora.value = obtenerFechaHoraActualCap();
+    dlInputSku.value = "";
+    dlInputBodega.value = "";
+    fotosModalCaptura = [];
+    renderizarPreviewsDlModal();
+    dlModalForm.style.display = "flex";
+    dlInputSku.focus();
+  });
+
+  btnEditarActualCap.addEventListener("click", () => {
+    if (!capturaSeleccionada) return;
+    dlModalTitulo.textContent = `Editar Captura (${capturaSeleccionada.sku})`;
+    dlInputIdRegistro.value = capturaSeleccionada.id_registro;
+    dlInputFechaHora.value = capturaSeleccionada.fecha_hora;
+    dlInputSku.value = capturaSeleccionada.sku;
+    dlInputBodega.value = capturaSeleccionada.bodega;
+    fotosModalCaptura = (capturaSeleccionada.fotos || []).map((f) => ({
+      url: f.url,
+      path: f.path,
+      isNew: false
+    }));
+    renderizarPreviewsDlModal();
+    dlModalForm.style.display = "flex";
+  });
+
+  document.getElementById("btnCerrarDlModal").addEventListener("click", () => {
+    dlModalForm.style.display = "none";
+  });
+  document.getElementById("btnCancelarDlModal").addEventListener("click", () => {
+    dlModalForm.style.display = "none";
+  });
+
+  formCapturaPrevia.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (fotosModalCaptura.length === 0) {
+      return mostrarErrorEstado("Falta fotografía", "Debe tomar o adjuntar al menos 1 fotografía.");
+    }
+
+    try {
+      dlModalForm.style.display = "none";
+      mostrarCargando("Cargando...", "Subiendo fotografías comprimidas a Supabase...");
+
+      const db = window.getSupabaseClient();
+      const skuLimpio = dlInputSku.value.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+      const fotosFinales = [];
+
+      for (let i = 0; i < fotosModalCaptura.length; i++) {
+        const f = fotosModalCaptura[i];
+        if (!f.isNew) {
+          fotosFinales.push({ url: f.url, path: f.path });
+          continue;
+        }
+        const fileName = `${Date.now()}_${skuLimpio}_Img${i + 1}.jpg`;
+        const { error: upErr } = await db.storage
+          .from("fotos-labeling")
+          .upload(fileName, f.blob, { contentType: "image/jpeg", upsert: true });
+        if (upErr) throw new Error("Error subiendo a Storage: " + upErr.message);
+
+        const { data: pub } = db.storage.from("fotos-labeling").getPublicUrl(fileName);
+        fotosFinales.push({ path: fileName, url: pub.publicUrl });
+      }
+
+      const res = await window.apiPost("saveDiscrepancia", {
+        id_registro: dlInputIdRegistro.value || null,
+        fecha_hora: dlInputFechaHora.value,
+        sku: dlInputSku.value.trim().toUpperCase(),
+        bodega: dlInputBodega.value.trim().toUpperCase(),
+        fotos: fotosFinales
+      });
+      if (!res.ok) throw new Error(res.message);
+
+      await cargarRegistrosCapturaPrevia();
+      mostrarCompletado(
+        "Captura Guardada",
+        `Se guardó el Código ${dlInputSku.value.trim().toUpperCase()} / Bodega ${dlInputBodega.value.trim().toUpperCase()} con ${fotosFinales.length} foto(s).`
+      );
+    } catch (err) {
+      mostrarErrorEstado("Error al guardar captura", err.message);
+    }
+  });
+
+  btnEliminarFilaCap.addEventListener("click", async () => {
+    if (!capturaSeleccionada) return;
+    const ok = await mostrarConfirmacionConLogo(
+      "Eliminar Captura",
+      `¿Eliminar el registro Código ${capturaSeleccionada.sku} (Bodega ${capturaSeleccionada.bodega}) y sus fotos del Storage?`,
+      "Eliminar"
+    );
+    if (!ok) return;
+
+    try {
+      mostrarCargando("Cargando...", "Eliminando registro y fotos del Storage...");
+      const res = await window.apiPost("deleteDiscrepanciaRow", {
+        id_registro: capturaSeleccionada.id_registro
+      });
+      if (!res.ok) throw new Error(res.message);
+      await cargarRegistrosCapturaPrevia();
+      mostrarCompletado("Registro Eliminado", "Se eliminó el registro y sus fotografías.");
+    } catch (err) {
+      mostrarErrorEstado("Error al eliminar", err.message);
+    }
+  });
+
+  btnBorrarTodoCap.addEventListener("click", async () => {
+    if (registrosCaptura.length === 0) {
+      return mostrarErrorEstado("Sin registros", "No hay capturas para borrar.");
+    }
+    const ok = await mostrarConfirmacionConLogo(
+      "Borrar Todas las Capturas",
+      `¿Borrar todos los ${registrosCaptura.length} registros de Captura de Imágenes y liberar el Storage?`,
+      "Borrar Todo"
+    );
+    if (!ok) return;
+
+    try {
+      mostrarCargando("Cargando...", "Limpiando tabla y bucket de capturas...");
+      const res = await window.apiPost("clearAllDiscrepancias");
+      if (!res.ok) throw new Error(res.message);
+      await cargarRegistrosCapturaPrevia();
+      mostrarCompletado(
+        "Limpieza Completada",
+        `Se eliminaron todos los registros y ${res.deletedImages} foto(s) del Storage.`
+      );
+    } catch (err) {
+      mostrarErrorEstado("Error al borrar todo", err.message);
+    }
+  });
+
+  // =========================================================================
+  // 12. BOTÓN: CONSOLIDADO FINAL (HOJA x HOJA, SKU x SKU -> ITEM #1, #2...)
+  // =========================================================================
+  if (btnConsolidadoFinal) {
+    btnConsolidadoFinal.addEventListener("click", async () => {
+      const hojasGeneradas = obtenerNombresHojasGeneradas();
+      if (hojasGeneradas.length === 0) {
+        return mostrarErrorEstado(
+          "Faltan Hojas Generadas",
+          "Primero ejecute los 3 botones (Importar, Generar Nro Reporte y Generar Reporte) para crear las hojas."
+        );
+      }
+
+      try {
+        mostrarCargando(
+          "Consolidando Fotos...",
+          "Buscando hoja por hoja y SKU por SKU en la BD de Captura de Imágenes (Bodega = Cód. Discrepancia + 4 últimos dígitos del SKU)..."
+        );
+
+        const resCap = await window.apiPost("listDiscrepancias");
+        if (!resCap.ok) throw new Error(resCap.message);
+        const bdCapturas = resCap.rows || [];
+
+        if (bdCapturas.length === 0) {
+          return mostrarErrorEstado(
+            "Sin Fotos Capturadas",
+            "No hay registros en 'Captura de Imágenes'. Registre primero las fotos antes de consolidar."
+          );
+        }
+
+        const fotosParaConsolidar = [];
+        let itemsConFoto = 0;
+        let itemsSaltados = 0;
+
+        // Recorrer hoja por hoja
+        for (const nombreHoja of hojasGeneradas) {
+          const filasHoja = hojaRegistros.filter(
+            (r) =>
+              String(r.col_e_embarque || "")
+                .trim()
+                .replace(/\//g, "-")
+                .slice(0, 31) === nombreHoja
+          );
+
+          // Recorrer SKU por SKU siguiendo el correlativo ITEM #1, ITEM #2...
+          filasHoja.forEach((reg, idx) => {
+            const itemNro = idx + 1;
+            const skuCompleto = String(reg.col_g_sku || "").trim();
+            const ultimos4Sku = skuCompleto.slice(-4).toUpperCase();
+            const bodegaCodDisc = String(reg.col_l_cod_discrepancia || "")
+              .trim()
+              .toUpperCase();
+
+            // Buscar coincidencias exactas por Bodega (Codigo Discrepancia) y Código (4 últimos dígitos SKU)
+            const coincidencias = bdCapturas.filter((cap) => {
+              const capBodega = String(cap.bodega || "").trim().toUpperCase();
+              const capSku = String(cap.sku || "").trim().toUpperCase();
+              const coincideBodega = capBodega === bodegaCodDisc;
+              const coincideCodigo =
+                capSku === ultimos4Sku ||
+                (capSku.length >= 4 && capSku.slice(-4) === ultimos4Sku);
+              return coincideBodega && coincideCodigo;
+            });
+
+            if (coincidencias.length === 0) {
+              // Si no hay foto para este ITEM, salta al siguiente manteniendo su correlativo
+              itemsSaltados++;
+              return;
+            }
+
+            let agregoEnEsteItem = false;
+            coincidencias.forEach((cap) => {
+              const listaFotos = Array.isArray(cap.fotos) ? cap.fotos : [];
+              listaFotos.forEach((f) => {
+                if (!f?.url) return;
+                fotosParaConsolidar.push({
+                  hoja_nombre: nombreHoja,
+                  item_nro: itemNro,
+                  sku: skuCompleto,
+                  foto_path: `captura::${f.path || f.url}`,
+                  foto_url: f.url
+                });
+                agregoEnEsteItem = true;
+              });
+            });
+
+            if (agregoEnEsteItem) itemsConFoto++;
+            else itemsSaltados++;
+          });
+        }
+
+        const resCons = await window.apiPost("consolidarFotosLabeling", {
+          registrosFotos: fotosParaConsolidar
+        });
+        if (!resCons.ok) throw new Error(resCons.message);
+
+        // Mostrar la primera hoja generada con sus fotos consolidadas abajo
+        const destino = hojasGeneradas.includes(pestanaActiva)
+          ? pestanaActiva
+          : hojasGeneradas[0];
+        await activarPestana(destino);
+
+        mostrarCompletado(
+          "Consolidado Final Completado",
+          `Hojas revisadas: ${hojasGeneradas.length}\nÍtems con fotos asignadas: ${itemsConFoto}\nÍtems sin foto (saltados): ${itemsSaltados}\nTotal de imágenes colocadas: ${fotosParaConsolidar.length}`
+        );
+      } catch (err) {
+        mostrarErrorEstado("Error en Consolidado Final", err.message);
+      }
+    });
   }
 
   cargarMaestrosDesdeSupabase().then(() => cargarEstadoDesdeSupabase());

@@ -30,8 +30,14 @@
       <div class="m3m-ribbon-left">
         <a href="./Menu-Opciones/menu.html" class="m3m-btn-back">← Menú</a>
 
-        <div class="m3m-ribbon-group">
+<div class="m3m-ribbon-group">
           <div class="m3m-ribbon-buttons">
+            <!-- PASO PREVIO: CAPTURA DE IMÁGENES (INTERFAZ VERDE) -->
+            <button type="button" class="m3m-ribbon-btn m3m-btn-captura" id="btnAbrirCapturaFotos">
+              <span class="m3m-icon">📸</span>
+              <span class="m3m-text">Captura de<br>Imágenes</span>
+            </button>
+
             <label class="m3m-ribbon-btn" id="lblImportarExcel">
               <span class="m3m-icon">📥</span>
               <span class="m3m-text">Importar<br>Discrepancia</span>
@@ -46,6 +52,12 @@
             <button type="button" class="m3m-ribbon-btn" id="btnGenerarPlantillas">
               <span class="m3m-icon">📄</span>
               <span class="m3m-text">Generar<br>Reporte</span>
+            </button>
+
+            <!-- CRUCE AUTOMÁTICO POR BODEGA (COD. DISCREPANCIA) + 4 ÚLTIMOS DÍGITOS DEL SKU -->
+            <button type="button" class="m3m-ribbon-btn m3m-btn-consolidado" id="btnConsolidadoFinal">
+              <span class="m3m-icon">🔗</span>
+              <span class="m3m-text">Consolidado<br>Final</span>
             </button>
 
             <button type="button" class="m3m-ribbon-btn m3m-btn-export-xlsx" id="btnExportarExcelHoja">
@@ -76,8 +88,88 @@
       </div>
     </header>
 
-    <!-- CONTENEDOR DE HOJAS -->
+<!-- CONTENEDOR DE HOJAS -->
     <section class="m3m-sheet-viewport">
+      <!-- 0. VISTA CAPTURA DE IMÁGENES (CABECERA VERDE PREVIA AL PROCESO) -->
+      <div class="m3m-sheet-pane" id="pane-CapturaFotos">
+        <div class="dl-wrapper">
+          <header class="dl-topbar">
+            <div class="dl-topbar-left">
+              <button type="button" id="btnVolverDeCaptura" class="dl-btn-back">← Volver</button>
+              <div class="dl-title-box">
+                <h1>DISCREPANCIA — CAPTURA DE IMÁGENES</h1>
+                <span id="dlContadorRegistros">0 registros capturados</span>
+              </div>
+            </div>
+
+            <div class="dl-search-box">
+              <input type="search" id="dlInputBuscar" placeholder="🔍 Buscar por Código (4 dígitos SKU), Bodega o Fecha...">
+            </div>
+
+            <div class="dl-topbar-actions">
+              <button type="button" id="btnNuevoRegistroCaptura" class="dl-btn dl-btn-add">+ Añadir</button>
+            </div>
+          </header>
+
+          <section class="dl-split-layout">
+            <!-- TABLA IZQUIERDA -->
+            <div class="dl-table-panel">
+              <div class="dl-table-scroll">
+                <table class="dl-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha Hora ↓</th>
+                      <th>Código (4 últ. SKU)</th>
+                      <th>Bodega (Cód. Disc.)</th>
+                      <th>Imagen 1</th>
+                      <th>Imagen 2</th>
+                      <th>+ Fotos</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dlTablaBody">
+                    <tr><td colspan="6" class="dl-empty-msg">Cargando registros de captura...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- DETALLE DERECHO -->
+            <aside class="dl-detail-panel">
+              <div class="dl-detail-header">
+                <strong id="detTituloFecha">Seleccione un registro</strong>
+                <div class="dl-detail-tools">
+                  <button type="button" id="btnEditarActualCap" class="dl-btn-sm dl-btn-edit" disabled>✎ Editar</button>
+                  <button type="button" id="btnEliminarFilaCap" class="dl-btn-sm dl-btn-del-row" disabled>🗑 Fila</button>
+                </div>
+              </div>
+
+              <div class="dl-detail-body">
+                <div class="dl-main-photo-box">
+                  <img id="detImagenPrincipal" src="" alt="Vista previa" style="display:none;">
+                  <div id="detSinFoto" class="dl-no-photo">Seleccione una fila para ver sus fotos</div>
+                </div>
+
+                <div class="dl-thumbs-strip" id="detMiniaturas"></div>
+
+                <div class="dl-clear-all-zone">
+                  <button type="button" id="btnBorrarTodoCap" class="dl-btn-clear-all">
+                    <span class="dl-trash-circle">🗑️</span>
+                    <span>Borrar Todo</span>
+                  </button>
+                </div>
+
+                <div class="dl-meta-list">
+                  <div class="dl-meta-item"><span>Fecha Hora</span><strong id="detFechaHora">—</strong></div>
+                  <div class="dl-meta-item"><span>Código (4 últ. SKU)</span><strong id="detSku">—</strong></div>
+                  <div class="dl-meta-item"><span>Bodega (Cód. Discrepancia)</span><strong id="detBodega">—</strong></div>
+                  <div class="dl-meta-item"><span>Registrado por</span><strong id="detUsuario">—</strong></div>
+                </div>
+              </div>
+            </aside>
+          </section>
+        </div>
+      </div>
+
       <!-- 1. HOJA REGISTROS -->
       <div class="m3m-sheet-pane active" id="pane-Registros">
         <div class="m3m-pane-toolbar">
@@ -301,6 +393,57 @@
           <button type="button" id="btnGuardarFotoEditada" class="m3m-btn-primary">💾 Guardar Foto</button>
         </div>
       </div>
+    </div>
+  </div>
+
+<!-- MODAL DE CAPTURA PREVIA (FECHA HORA + CÓDIGO 4 DÍGITOS + BODEGA TEXTO PLANO + CÁMARA NATIVA) -->
+  <div class="dl-modal-backdrop" id="dlModalForm" style="display:none;">
+    <div class="dl-modal">
+      <div class="dl-modal-header">
+        <h2 id="dlModalTitulo">Añadir Registro de Fotos</h2>
+        <button type="button" id="btnCerrarDlModal" class="dl-modal-close">✕</button>
+      </div>
+
+      <form id="formCapturaPrevia" class="dl-modal-body">
+        <input type="hidden" id="dlInputIdRegistro" value="">
+
+        <div class="dl-form-group">
+          <label>Fecha y Hora (Automática)</label>
+          <input type="text" id="dlInputFechaHora" readonly>
+        </div>
+
+        <div class="dl-form-row">
+          <div class="dl-form-group">
+            <label for="dlInputSku">Código (4 últimos dígitos SKU) *</label>
+            <input type="text" id="dlInputSku" placeholder="Ej: 0316" required autocomplete="off">
+          </div>
+
+          <div class="dl-form-group">
+            <label for="dlInputBodega">Bodega (Cód. Discrepancia) *</label>
+            <input type="text" id="dlInputBodega" placeholder="Ej: F9, F10, F1" required autocomplete="off">
+          </div>
+        </div>
+
+        <div class="dl-form-group">
+          <label>Fotografías de Mercadería (1 o más fotos - Compresión automática ~45 KB)</label>
+          <div class="dl-camera-buttons">
+            <label class="dl-cam-btn dl-cam-native">
+              📷 Tomar Foto con Cámara
+              <input type="file" id="dlInputCamaraNativa" accept="image/*" capture="environment" hidden>
+            </label>
+            <label class="dl-cam-btn dl-cam-gallery">
+              🖼️ Subir de Galería / PC
+              <input type="file" id="dlInputGaleriaMultiple" accept="image/*" multiple hidden>
+            </label>
+          </div>
+          <div id="dlPreviewFotosContainer" class="dl-preview-grid"></div>
+        </div>
+
+        <div class="dl-modal-footer">
+          <button type="button" id="btnCancelarDlModal" class="dl-btn dl-btn-cancel">Cancelar</button>
+          <button type="submit" id="btnGuardarDlRegistro" class="dl-btn dl-btn-save">Guardar Registro</button>
+        </div>
+      </form>
     </div>
   </div>
 
