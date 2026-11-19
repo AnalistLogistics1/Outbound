@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Discrepancia Labeling | Sistema Logístico</title>
+  <title>Macros 3M - Discrepancia Labeling | Sistema Logístico</title>
 
   <link rel="stylesheet" href="./part/cabecera.css">
   <link rel="stylesheet" href="./part/footer.css">
@@ -14,166 +14,293 @@
   <link rel="apple-touch-icon" href="./img/logo.png">
   <link rel="icon" type="image/png" href="./img/logo.png">
 
-  <!-- Supabase SDK + ExcelJS (Excel con fotos incrustadas) + JSZip (Paquete ZIP para Macro) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <div id="contenedor-cabecera"></div>
 
-  <main class="dl-wrapper">
-    <!-- BARRA SUPERIOR ESTILO APPSHEET + CORPORATIVA -->
-    <header class="dl-topbar">
-      <div class="dl-topbar-left">
-        <a href="./Menu-Opciones/menu.html" class="dl-btn-back">← Menú</a>
-        <div class="dl-title-box">
-          <h1>DISCREPANCIA — LABELING</h1>
-          <span id="dlContadorRegistros">0 registros activos</span>
+  <main class="m3m-workspace">
+    <!-- CINTA SUPERIOR RESPONSIVE -->
+    <header class="m3m-ribbon">
+      <div class="m3m-ribbon-left">
+        <a href="./Menu-Opciones/menu.html" class="m3m-btn-back">← Menú</a>
+
+        <div class="m3m-ribbon-group">
+          <div class="m3m-ribbon-buttons">
+            <label class="m3m-ribbon-btn" id="lblImportarExcel">
+              <span class="m3m-icon">📥</span>
+              <span class="m3m-text">Importar<br>Discrepancia</span>
+              <input type="file" id="inputExcelOrigen" accept=".xlsx,.xls" hidden>
+            </label>
+
+            <button type="button" class="m3m-ribbon-btn" id="btnGenerarNroReporte">
+              <span class="m3m-icon">🔢</span>
+              <span class="m3m-text">Generar Nro<br>Reporte</span>
+            </button>
+
+            <button type="button" class="m3m-ribbon-btn" id="btnGenerarPlantillas">
+              <span class="m3m-icon">📄</span>
+              <span class="m3m-text">Generar<br>Reporte</span>
+            </button>
+
+            <button type="button" class="m3m-ribbon-btn m3m-btn-export-xlsx" id="btnExportarExcelHoja">
+              <span class="m3m-icon">📊</span>
+              <span class="m3m-text">Descargar<br>Excel (.xlsx)</span>
+            </button>
+
+            <button type="button" class="m3m-ribbon-btn m3m-btn-export-pdf" id="btnExportarPdfHorizontal">
+              <span class="m3m-icon">📑</span>
+              <span class="m3m-text">Descargar<br>PDF Horizontal</span>
+            </button>
+
+            <button type="button" class="m3m-ribbon-btn m3m-btn-reset" id="btnResetearProceso">
+              <span class="m3m-icon">🗑️</span>
+              <span class="m3m-text">Resetear<br>y Limpiar</span>
+            </button>
+          </div>
+          <div class="m3m-group-title">PROCESO DISCREPANCIA LABELING</div>
         </div>
       </div>
 
-      <div class="dl-search-box">
-        <input type="search" id="dlInputBuscar" placeholder="🔍 Búsqueda por SKU, Bodega o Fecha...">
-      </div>
-
-      <div class="dl-topbar-actions">
-        <button type="button" id="btnNuevoRegistro" class="dl-btn dl-btn-add">+ Añadir</button>
-        <button type="button" id="btnDescargarExcel" class="dl-btn dl-btn-excel" title="Descarga Excel .xlsx con fotos tamaño mediano y pie de página">📥 Excel con Fotos</button>
-        <button type="button" id="btnDescargarZipMacro" class="dl-btn dl-btn-zip" title="Descarga ZIP con CSV + Fotos físicas listas para Macro VBA">📦 ZIP para Macro</button>
+      <div class="m3m-ribbon-right">
+        <label class="m3m-toggle-hidden">
+          <input type="checkbox" id="chkMostrarHojasOcultas">
+          <span>👁️ Hojas Base</span>
+        </label>
+        <div class="m3m-status-pill" id="m3mEstadoProceso">Cargando...</div>
       </div>
     </header>
 
-    <!-- PANEL DIVIDIDO IZQUIERDA (TABLA) / DERECHA (VISOR DETALLE + BORRAR TODO) -->
-    <section class="dl-split-layout">
-      <!-- IZQUIERDA: TABLA DE REGISTROS -->
-      <div class="dl-table-panel">
-        <div class="dl-table-scroll">
-          <table class="dl-table">
+    <!-- CONTENEDOR DE HOJAS -->
+    <section class="m3m-sheet-viewport">
+      <!-- 1. HOJA REGISTROS -->
+      <div class="m3m-sheet-pane active" id="pane-Registros">
+        <div class="m3m-pane-toolbar">
+          <strong>Hoja: REGISTROS (Columnas A : Q)</strong>
+          <span>Columna <b>F (Lote)</b> en formato texto y <b>P</b> editable.</span>
+        </div>
+        <div class="m3m-table-scroll">
+          <table class="m3m-grid-table" id="tablaRegistros">
             <thead>
               <tr>
-                <th>Fecha Hora ↓</th>
-                <th>SKU</th>
-                <th>Bodega</th>
-                <th>Imagen 1</th>
-                <th>Imagen 2</th>
-                <th>+ Fotos</th>
+                <th>Fila</th>
+                <th>A: N°</th>
+                <th>B: Area</th>
+                <th>C: Fecha</th>
+                <th>D: #Traspaso/Bodega</th>
+                <th>E: costo/embarque</th>
+                <th>F: Lote (@Texto)</th>
+                <th>G: SKU</th>
+                <th>H: Descripción</th>
+                <th>I: UM</th>
+                <th>J: STOCK</th>
+                <th>K: Vencimiento</th>
+                <th>L: Cod. Discrepancia</th>
+                <th>M: Descripción del Problema</th>
+                <th>N</th>
+                <th>O</th>
+                <th>P: Clasificación Médico</th>
+                <th>Q: Nro de Reporte</th>
               </tr>
             </thead>
-            <tbody id="dlTablaBody">
-              <tr>
-                <td colspan="6" class="dl-empty-msg">Cargando registros...</td>
-              </tr>
+            <tbody id="tbodyRegistros">
+              <tr><td colspan="18" class="m3m-empty">Use "Importar Discrepancia" para cargar su archivo (Hoja1).</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- DERECHA: VISOR DE DETALLE (IGUAL A TU INTERFAZ APPSHEET) -->
-      <aside class="dl-detail-panel" id="dlDetailPanel">
-        <div class="dl-detail-header">
-          <strong id="detTituloFecha">Seleccione un registro</strong>
-          <div class="dl-detail-tools">
-            <button type="button" id="btnEditarActual" class="dl-btn-sm dl-btn-edit" disabled>✎ Editar</button>
-            <button type="button" id="btnEliminarFila" class="dl-btn-sm dl-btn-del-row" disabled title="Eliminar solo esta fila">🗑 Fila</button>
+      <!-- 2. PLANTILLA 3M Y HOJAS GENERADAS -->
+      <div class="m3m-sheet-pane" id="pane-PlantillaVista">
+        <div class="m3m-doc-canvas" id="m3mDocCanvas">
+          <!-- CABECERA 3M -->
+          <table class="m3m-template-header">
+            <tr>
+              <td class="m3m-logo-cell" rowspan="4"><div class="m3m-logo-3m">3M</div></td>
+              <td class="m3m-title-cell" rowspan="4">REPORTE DE DISCREPANCIAS NIVEL 2 ANDINA</td>
+              <td class="m3m-meta-label">Código:</td>
+              <td class="m3m-meta-val">3MLATAM-AND-RFO-854014</td>
+            </tr>
+            <tr><td class="m3m-meta-label">Revisión:</td><td class="m3m-meta-val">1</td></tr>
+            <tr><td class="m3m-meta-label">Fecha de vigencia:</td><td class="m3m-meta-val">4/10/2022</td></tr>
+            <tr><td class="m3m-meta-label">Fecha de sustitución:</td><td class="m3m-meta-val">Nuevo</td></tr>
+          </table>
+
+          <!-- SUBCABECERA -->
+          <div class="m3m-subhead-row">
+            <div class="m3m-b7-badge" id="tplCeldaB7">NO MEDICO</div>
+            <table class="m3m-process-box">
+              <tr><td class="m3m-proc-lbl">PROCESO:</td><td class="m3m-proc-val">LABORATORIO/LABELING</td></tr>
+              <tr><td class="m3m-proc-lbl">SITE:</td><td class="m3m-proc-val">CHILCA</td></tr>
+            </table>
+            <table class="m3m-report-box">
+              <tr><td class="m3m-rep-lbl">Número de reporte</td><td class="m3m-rep-val" id="tplCeldaL7"></td></tr>
+              <tr><td class="m3m-rep-lbl">Fecha</td><td class="m3m-rep-val" id="tplCeldaL8"></td></tr>
+            </table>
+          </div>
+
+          <!-- TABLA CON COLUMNA ITEM A LA IZQUIERDA DE EMBARQUE Y SKU CLICKEABLE -->
+          <div class="m3m-table-scroll-inner">
+            <table class="m3m-template-grid">
+              <thead>
+                <tr>
+                  <th style="width:5%">ITEM</th>
+                  <th style="width:11%">Embarque</th>
+                  <th style="width:10%">SKU <small>(📷)</small></th>
+                  <th style="width:19%">Descripción</th>
+                  <th style="width:5%">UM</th>
+                  <th style="width:6%">Cantidad</th>
+                  <th style="width:9%">Lote</th>
+                  <th style="width:8%">Fecha Vencimiento</th>
+                  <th style="width:7%">Traspaso</th>
+                  <th style="width:7%">Codigo Discrepancia</th>
+                  <th style="width:16%" colspan="2">Descripción del problema</th>
+                </tr>
+              </thead>
+              <tbody id="tplTablaBody"></tbody>
+            </table>
+          </div>
+
+          <!-- ZONA DE FOTOS DEBAJO DE LA TABLA CON ITEM ENCIMA DE CADA FOTO Y BOTÓN EDITAR -->
+          <div class="m3m-photos-section" id="tplZonaFotos">
+            <div class="m3m-photos-header">
+              <span>📸 Evidencias Fotográficas — Hoja: <strong id="tplNombreHojaActual">Plantilla</strong></span>
+              <small>Toca cualquier <b>SKU</b> de la tabla para tomar o subir foto (se comprime automáticamente en KB).</small>
+            </div>
+            <div class="m3m-photos-grid" id="tplFotosGrid"></div>
           </div>
         </div>
-
-        <div class="dl-detail-body" id="dlDetailBody">
-          <!-- Carrusel / Galería de fotos del registro seleccionado -->
-          <div class="dl-main-photo-box" id="detPhotoBox">
-            <img id="detImagenPrincipal" src="" alt="Vista previa" style="display:none;">
-            <div id="detSinFoto" class="dl-no-photo">Seleccione una fila para ver sus fotos</div>
-          </div>
-
-          <div class="dl-thumbs-strip" id="detMiniaturas"></div>
-
-          <!-- BOTÓN VERDE CIRCULAR "BORRAR TODO" (IDÉNTICO A APPSHEET + LIMPIEZA STORAGE) -->
-          <div class="dl-clear-all-zone">
-            <button type="button" id="btnBorrarTodo" class="dl-btn-clear-all">
-              <span class="dl-trash-circle">🗑️</span>
-              <span>Borrar Todo</span>
-            </button>
-          </div>
-
-          <!-- DATOS DEL REGISTRO -->
-          <div class="dl-meta-list">
-            <div class="dl-meta-item">
-              <span>Fecha Hora</span>
-              <strong id="detFechaHora">—</strong>
-            </div>
-            <div class="dl-meta-item">
-              <span>SKU</span>
-              <strong id="detSku">—</strong>
-            </div>
-            <div class="dl-meta-item">
-              <span>Bodega</span>
-              <strong id="detBodega">—</strong>
-            </div>
-            <div class="dl-meta-item">
-              <span>Registrado por</span>
-              <strong id="detUsuario">—</strong>
-            </div>
-          </div>
-        </div>
-      </aside>
-    </section>
-  </main>
-
-  <!-- MODAL DE REGISTRO / EDICIÓN (COMPATIBLE CON CÁMARA NATIVA iOS Y ANDROID) -->
-  <div class="dl-modal-backdrop" id="dlModalForm" style="display:none;">
-    <div class="dl-modal">
-      <div class="dl-modal-header">
-        <h2 id="modalTitulo">Nuevo Registro Labeling</h2>
-        <button type="button" id="btnCerrarModal" class="dl-modal-close">✕</button>
       </div>
 
-      <form id="formDiscrepancia" class="dl-modal-body">
-        <input type="hidden" id="inputIdRegistro" value="">
-
-        <div class="dl-form-group">
-          <label>Fecha y Hora (Automática)</label>
-          <input type="text" id="inputFechaHora" readonly>
+      <!-- 3. HOJA DB -->
+      <div class="m3m-sheet-pane" id="pane-DB">
+        <div class="m3m-pane-toolbar">
+          <strong>Hoja Base: DB (Historial de Correlativos)</strong>
+          <span>Celdas en gris = actualizadas a <b>COSTO 1111</b>.</span>
         </div>
-
-<div class="dl-form-row">
-          <div class="dl-form-group">
-            <label for="inputSku">SKU *</label>
-            <input type="text" id="inputSku" placeholder="Ej: 9959" required autocomplete="off">
-          </div>
-
-          <div class="dl-form-group">
-            <label for="inputBodega">Bodega *</label>
-            <input type="text" id="inputBodega" placeholder="Ingrese bodega" required autocomplete="off">
-          </div>
+        <div class="m3m-table-scroll">
+          <table class="m3m-grid-table">
+            <thead>
+              <tr class="m3m-yellow-head">
+                <th>A: NRO DE REPORTE LABORATORIO</th>
+                <th>B: NRO DE REPORTE LABELING NO MEDICO</th>
+                <th>C: NRO DE REPORTE LABELING MEDICO SIN RS</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyDB"></tbody>
+          </table>
         </div>
+      </div>
 
-        <!-- CAPTURA DE FOTOS NATIVA PARA iOS Y ANDROID -->
-        <div class="dl-form-group">
-          <label>Fotografías de Mercadería (1 o más fotos - Compresión automática ~45 KB)</label>
-          
-          <div class="dl-camera-buttons">
-            <!-- Botón 1: Abre directamente la cámara trasera nativa en iPhone/iPad y Android -->
-            <label class="dl-cam-btn dl-cam-native">
-              📷 Tomar Foto con Cámara
-              <input type="file" id="inputCamaraNativa" accept="image/*" capture="environment" hidden>
-            </label>
-
-            <!-- Botón 2: Permite elegir 1 o varias fotos desde la galería o PC -->
-            <label class="dl-cam-btn dl-cam-gallery">
-              🖼️ Subir de Galería / PC
-              <input type="file" id="inputGaleriaMultiple" accept="image/*" multiple hidden>
-            </label>
-          </div>
-
-          <div id="previewFotosContainer" class="dl-preview-grid"></div>
+      <!-- 4. HOJA MEDICOS SIN RS -->
+      <div class="m3m-sheet-pane" id="pane-MEDICOS">
+        <div class="m3m-pane-toolbar"><strong>Hoja Base: MEDICOS SIN RS</strong></div>
+        <div class="m3m-table-scroll">
+          <table class="m3m-grid-table">
+            <thead>
+              <tr class="m3m-yellow-head">
+                <th>A: SKU</th>
+                <th>B: DESCRIPCION</th>
+                <th>C: UM</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyMedicos"></tbody>
+          </table>
         </div>
+      </div>
 
-        <div class="dl-modal-footer">
-          <button type="button" id="btnCancelarModal" class="dl-btn dl-btn-cancel">Cancelar</button>
-          <button type="submit" id="btnGuardarRegistro" class="dl-btn dl-btn-save">Guardar Registro</button>
+      <!-- 5. HOJA PRIORIZADOS -->
+      <div class="m3m-sheet-pane" id="pane-PRIORIZADOS">
+        <div class="m3m-pane-toolbar"><strong>Hoja Base: PRIORIZADOS</strong></div>
+        <div class="m3m-table-scroll">
+          <table class="m3m-grid-table">
+            <thead>
+              <tr class="m3m-purple-head">
+                <th>A: ID_3M (SKU)</th>
+                <th>B: Description</th>
+                <th>C: PMUNIT</th>
+                <th>D: Observación</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyPriorizados"></tbody>
+          </table>
         </div>
-      </form>
+      </div>
+    </section>
+
+<!-- BARRA INFERIOR DE PESTAÑAS SIEMPRE VISIBLE -->
+    <div class="m3m-tabs-bar" id="m3mTabsBar">
+      <button type="button" class="m3m-tab m3m-tab-yellow is-hidden-sheet" data-target="Plantilla Discrepancia">Plantilla Discrepancia</button>
+      <button type="button" class="m3m-tab m3m-tab-yellow is-hidden-sheet" data-target="PRIORIZADOS">PRIORIZADOS</button>
+      <button type="button" class="m3m-tab m3m-tab-yellow is-hidden-sheet" data-target="MEDICOS SIN RS">MEDICOS SIN RS</button>
+      <button type="button" class="m3m-tab m3m-tab-yellow is-hidden-sheet" data-target="DB">DB</button>
+      <button type="button" class="m3m-tab m3m-tab-navy active" data-target="Registros">Registros</button>
+      <div id="m3mDynamicTabs" class="m3m-dynamic-tabs"></div>
+    </div>
+  </main>
+
+  <!-- VENTANA EMERGENTE DE CARGANDO / COMPLETADO CON LOGO -->
+  <div class="m3m-status-backdrop" id="modalEstadoProceso" style="display:none;">
+    <div class="m3m-status-card" id="statusCardBox">
+      <div class="m3m-logo-loader-wrap">
+        <img src="./img/logo.png" alt="Logo" class="m3m-status-logo" onerror="this.style.display='none'">
+        <div class="m3m-spinner" id="statusSpinner"></div>
+        <div class="m3m-check-badge" id="statusCheckIcon" style="display:none;">✓</div>
+      </div>
+<h3 id="statusTitulo">Cargando...</h3>
+      <p id="statusMensaje">Procesando información, por favor espere.</p>
+      <div class="m3m-status-actions" id="statusActionsBox">
+        <button type="button" id="btnCancelarConfirmacion" class="m3m-status-btn m3m-status-btn-cancel" style="display:none;">Cancelar</button>
+        <button type="button" id="btnConfirmarAccion" class="m3m-status-btn m3m-status-btn-confirm" style="display:none;">Eliminar</button>
+        <button type="button" id="btnCerrarEstadoProceso" class="m3m-status-btn" style="display:none;">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUTS OCULTOS PARA CÁMARA NATIVA iOS/ANDROID Y GALERÍA -->
+  <input type="file" id="inputCamaraSku" accept="image/*" capture="environment" hidden>
+  <input type="file" id="inputGaleriaSku" accept="image/*" multiple hidden>
+
+  <!-- MODAL DE CAPTURA / SELECCIÓN DE ORIGEN -->
+  <div class="m3m-modal-backdrop" id="modalCapturaSku" style="display:none;">
+    <div class="m3m-modal-box">
+      <div class="m3m-modal-head">
+        <strong id="modalCapturaTitulo">Capturar Foto — ITEM #1 | SKU</strong>
+        <button type="button" id="btnCerrarModalCaptura" class="m3m-modal-close">✕</button>
+      </div>
+      <div class="m3m-modal-body">
+        <p class="m3m-modal-hint">Elige cómo deseas agregar la foto para este ítem (se comprimirá automáticamente a ~45 KB):</p>
+        <div class="m3m-capture-actions">
+          <button type="button" id="btnAbrirCamaraNativa" class="m3m-btn-cam">📷 Cámara Nativa (iOS / Android)</button>
+          <button type="button" id="btnAbrirGaleriaSku" class="m3m-btn-gal">🖼️ Galería / Archivo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITOR DE FLECHA ROJA (DURANTE CAPTURA O POSTERIOR) -->
+  <div class="m3m-modal-backdrop" id="modalEditorFlecha" style="display:none;">
+    <div class="m3m-modal-box m3m-modal-wide">
+      <div class="m3m-modal-head">
+        <strong id="modalFlechaTitulo">Editar Foto — Flecha Roja</strong>
+        <button type="button" id="btnCerrarEditorFlecha" class="m3m-modal-close">✕</button>
+      </div>
+      <div class="m3m-modal-body">
+        <p class="m3m-modal-hint">Arrastra o toca inicio y fin sobre la foto para trazar la <b>flecha roja</b> señalando el defecto/discrepancia:</p>
+        <div class="m3m-canvas-editor-wrap">
+          <canvas id="canvasEditorFlecha"></canvas>
+        </div>
+        <div class="m3m-editor-toolbar">
+          <button type="button" id="btnDeshacerFlecha" class="m3m-btn-sec">↩ Deshacer</button>
+          <button type="button" id="btnLimpiarFlechas" class="m3m-btn-sec">🧹 Limpiar Flechas</button>
+          <button type="button" id="btnGuardarFotoEditada" class="m3m-btn-primary">💾 Guardar Foto</button>
+        </div>
+      </div>
     </div>
   </div>
 

@@ -1024,6 +1024,198 @@ await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Re
           return { ok: true, deletedImages: allPaths.length };
         }
 
+// ==========================================
+        // MÓDULO MACRO 3M DISCREPANCIA LABELING
+        // ==========================================
+        case "getMaestrosLabeling": {
+          const { data: prioData, error: errPrio } = await db.from("maestros_priorizados").select("*");
+          if (errPrio) throw new Error(errPrio.message);
+          const { data: medData, error: errMed } = await db.from("maestros_medicos_sin_rs").select("*");
+          if (errMed) throw new Error(errMed.message);
+          return { ok: true, priorizados: prioData || [], medicosSinRs: medData || [] };
+        }
+
+        case "getMacroLabelingState": {
+          const { data: regData, error: errReg } = await db
+            .from("labeling_registros")
+            .select("*")
+            .order("fila_excel", { ascending: true });
+          if (errReg) throw new Error(errReg.message);
+
+          const { data: dbData, error: errDb } = await db
+            .from("labeling_db")
+            .select("*")
+            .order("id", { ascending: true });
+          if (errDb) throw new Error(errDb.message);
+
+          return { ok: true, registros: regData || [], dbRows: dbData || [] };
+        }
+
+        case "importarRegistrosLabeling": {
+          const { filas } = payload;
+          if (!Array.isArray(filas) || filas.length === 0) {
+            throw new Error("No hay registros válidos para importar.");
+          }
+          const { error: errClear } = await db.from("labeling_registros").delete().neq("id", 0);
+          if (errClear) throw new Error(errClear.message);
+
+          const { error: errIns } = await db.from("labeling_registros").insert(filas);
+          if (errIns) throw new Error(errIns.message);
+          return { ok: true, total: filas.length };
+        }
+
+        case "guardarCorrelativosLabeling": {
+          const { actualizacionesRegistros, nuevosDB } = payload;
+          if (Array.isArray(nuevosDB) && nuevosDB.length > 0) {
+            const { error: errDb } = await db.from("labeling_db").insert(nuevosDB);
+            if (errDb) throw new Error(errDb.message);
+          }
+          if (Array.isArray(actualizacionesRegistros)) {
+            for (const item of actualizacionesRegistros) {
+              await db.from("labeling_registros").update({
+                col_p_tipo_medico: item.col_p_tipo_medico,
+                col_q_nro_reporte: item.col_q_nro_reporte
+              }).eq("id", item.id);
+            }
+          }
+          return { ok: true };
+        }
+
+        case "confirmarPlantillasYActualizarDB": {
+          const { prefijosHojas } = payload;
+          const NUEVO_CODIGO = "1111";
+          let reemplazos = 0;
+
+          await db.from("labeling_registros").update({ plantilla_generada: true }).neq("id", 0);
+
+          const { data: dbColB, error: errFetch } = await db
+            .from("labeling_db")
+            .select("*")
+            .eq("tipo_columna", "B")
+            .order("id", { ascending: false });
+
+          if (errFetch) throw new Error(errFetch.message);
+
+          for (const prefijo of (prefijosHojas || [])) {
+            if (!prefijo) continue;
+            const buscado = (`COSTO ${prefijo}`).toUpperCase();
+            const filaEncontrada = (dbColB || []).find((r) =>
+              String(r.valor_reporte || "").toUpperCase().includes(buscado)
+            );
+
+            if (filaEncontrada) {
+              const regex = new RegExp(`COSTO\\s+${prefijo}`, "i");
+              const nuevoTexto = filaEncontrada.valor_reporte.replace(regex, `COSTO ${NUEVO_CODIGO}`);
+              await db.from("labeling_db").update({
+                valor_reporte: nuevoTexto,
+                reemplazado_1111: true
+              }).eq("id", filaEncontrada.id);
+              filaEncontrada.valor_reporte = nuevoTexto;
+              reemplazos++;
+            }
+          }
+          return { ok: true, reemplazos };
+        }
+
+// ==========================================
+        // 9. FOTOS POR HOJA/ITEM + RESETEO STORAGE
+        // ==========================================
+        case "listLabelingFotos": {
+          const { hoja_nombre } = payload || {};
+          let query = db
+            .from("labeling_fotos")
+            .select("*")
+            .order("item_nro", { ascending: true })
+            .order("id", { ascending: true });
+
+          if (hoja_nombre) {
+            query = query.eq("hoja_nombre", hoja_nombre);
+          }
+
+          const { data, error } = await query;
+          if (error) throw new Error(error.message);
+          return { ok: true, fotos: data || [] };
+        }
+
+        case "saveLabelingFoto": {
+          const { id, hoja_nombre, item_nro, sku, foto_path, foto_url } = payload;
+          if (!hoja_nombre || !sku || !foto_path || !foto_url) {
+            throw new Error("Faltan datos obligatorios de la fotografía.");
+          }
+
+          if (id) {
+            // Reemplazo/edición de foto existente (ej. con flecha roja)
+            const { data: prev } = await db
+              .from("labeling_fotos")
+              .select("foto_path")
+              .eq("id", id)
+              .maybeSingle();
+
+            if (prev?.foto_path && prev.foto_path !== foto_path) {
+              await db.storage.from("fotos-labeling-hojas").remove([prev.foto_path]);
+            }
+
+            const { data: updated, error: upErr } = await db
+              .from("labeling_fotos")
+              .update({ foto_path, foto_url })
+              .eq("id", id)
+              .select()
+              .single();
+
+            if (upErr) throw new Error(upErr.message);
+            return { ok: true, foto: updated };
+          }
+
+          const { data: inserted, error: insErr } = await db
+            .from("labeling_fotos")
+            .insert([{
+              hoja_nombre,
+              item_nro: Number(item_nro) || 1,
+              sku: String(sku).trim(),
+              foto_path,
+              foto_url
+            }])
+            .select()
+            .single();
+
+          if (insErr) throw new Error(insErr.message);
+          return { ok: true, foto: inserted };
+        }
+
+        case "deleteLabelingFoto": {
+          const { id } = payload;
+          if (!id) throw new Error("ID de foto obligatorio.");
+
+          const { data: row } = await db
+            .from("labeling_fotos")
+            .select("foto_path")
+            .eq("id", id)
+            .maybeSingle();
+
+          if (row?.foto_path) {
+            await db.storage.from("fotos-labeling-hojas").remove([row.foto_path]);
+          }
+
+          const { error } = await db.from("labeling_fotos").delete().eq("id", id);
+          if (error) throw new Error(error.message);
+          return { ok: true };
+        }
+
+        case "resetProcesoYStorageLabeling": {
+          // 1. Borrar todas las fotos del bucket para liberar espacio en el plan Free
+          const { data: fotosRows } = await db.from("labeling_fotos").select("foto_path");
+          const paths = (fotosRows || []).map((f) => f.foto_path).filter(Boolean);
+          if (paths.length > 0) {
+            await db.storage.from("fotos-labeling-hojas").remove(paths);
+          }
+
+          // 2. Vaciar fotos, registros y pestañas generadas
+          await db.from("labeling_fotos").delete().neq("id", 0);
+          await db.from("labeling_registros").delete().neq("id", 0);
+
+          return { ok: true, deletedFotos: paths.length };
+        }
+
         default:
           throw new Error(`Acción no implementada todavía: ${action}`);
       }
