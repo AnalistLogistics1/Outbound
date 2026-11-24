@@ -54,10 +54,16 @@
               <span class="m3m-text">Generar<br>Reporte</span>
             </button>
 
-            <!-- CRUCE AUTOMÁTICO POR BODEGA (COD. DISCREPANCIA) + 4 ÚLTIMOS DÍGITOS DEL SKU -->
+<!-- CRUCE AUTOMÁTICO POR BODEGA (COD. DISCREPANCIA) + 4 ÚLTIMOS DÍGITOS DEL SKU -->
             <button type="button" class="m3m-ribbon-btn m3m-btn-consolidado" id="btnConsolidadoFinal">
               <span class="m3m-icon">🔗</span>
               <span class="m3m-text">Consolidado<br>Final</span>
+            </button>
+
+            <!-- CONSOLIDAR DATOS EN HISTÓRICO SUPABASE + DESCARGA EXCEL CONSOLIDADO (NO MEDICO / MEDICO SIN RS) -->
+            <button type="button" class="m3m-ribbon-btn m3m-btn-consolidar-datos" id="btnConsolidarDatos">
+              <span class="m3m-icon">🗂️</span>
+              <span class="m3m-text">Consolidar<br>Datos</span>
             </button>
 
             <button type="button" class="m3m-ribbon-btn m3m-btn-export-xlsx" id="btnExportarExcelHoja">
@@ -456,7 +462,7 @@
     </div>
   </div>
 
-  <script src="./js/api.js"></script>
+<script src="./js/api.js"></script>
   <script src="./js/auth.js"></script>
   <script src="./part/cabecera.js"></script>
   <script src="./part/footer.js"></script>

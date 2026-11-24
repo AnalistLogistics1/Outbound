@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const btnAbrirCapturaFotos = document.getElementById("btnAbrirCapturaFotos");
   const btnConsolidadoFinal = document.getElementById("btnConsolidadoFinal");
+  const btnConsolidarDatos = document.getElementById("btnConsolidarDatos");
   const inputExcelOrigen = document.getElementById("inputExcelOrigen");
   const btnGenerarNroReporte = document.getElementById("btnGenerarNroReporte");
   const btnGenerarPlantillas = document.getElementById("btnGenerarPlantillas");
@@ -305,6 +306,48 @@ if (targetName === "CapturaFotos") {
         );
       }
 
+const rangeOrigen = wsOrigen["!ref"] ? XLSX.utils.decode_range(wsOrigen["!ref"]) : { s: { r: 0, c: 0 } };
+
+      const leerFechaExactaDDMMYYYY = (ws, filaIdx, colIdx, fallbackTexto) => {
+        const ref = XLSX.utils.encode_cell({
+          r: rangeOrigen.s.r + filaIdx,
+          c: rangeOrigen.s.c + colIdx
+        });
+        const cell = ws[ref];
+
+        // 1) Número serial de Excel
+        if (cell && cell.t === "n" && typeof cell.v === "number") {
+          const parsed = XLSX.SSF.parse_date_code(cell.v);
+          if (parsed && parsed.y && parsed.m && parsed.d) {
+            return `${String(parsed.d).padStart(2, "0")}/${String(parsed.m).padStart(2, "0")}/${parsed.y}`;
+          }
+        }
+
+        // 2) Objeto Date de JS (si cellDates está activo)
+        if (cell && cell.v instanceof Date && !isNaN(cell.v.getTime())) {
+          const dd = String(cell.v.getUTCDate()).padStart(2, "0");
+          const mm = String(cell.v.getUTCMonth() + 1).padStart(2, "0");
+          const yyyy = cell.v.getUTCFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        }
+
+        // 3) Texto en MM/DD/AA o MM/DD/AAAA (ej. "11/20/26" -> "20/11/2026")
+        const txt = String(fallbackTexto ?? "").trim();
+        const mCorto = txt.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (mCorto) {
+          let p1 = parseInt(mCorto[1], 10);
+          let p2 = parseInt(mCorto[2], 10);
+          let yyyy = mCorto[3].length === 2 ? `20${mCorto[3]}` : mCorto[3];
+          // Si viene en formato US (MM/DD/AA como 11/20/26), invertir a DD/MM/AAAA
+          if (p2 > 12 && p1 <= 12) {
+            return `${String(p2).padStart(2, "0")}/${String(p1).padStart(2, "0")}/${yyyy}`;
+          }
+          return `${String(p1).padStart(2, "0")}/${String(p2).padStart(2, "0")}/${yyyy}`;
+        }
+
+        return normalizarFechaExcel(fallbackTexto, "/");
+      };
+
       const setPrio = getSetPriorizados();
       const filasMapeadas = [];
 
@@ -323,7 +366,7 @@ if (targetName === "CapturaFotos") {
           fila_excel: r + 1,
           col_a_nro: colA,
           col_b_area: String(row[1] ?? "").trim(),
-          col_c_fecha: normalizarFechaExcel(row[2], "/"),
+          col_c_fecha: leerFechaExactaDDMMYYYY(wsOrigen, r, 2, row[2]),
           col_d_traspaso: String(row[4] ?? "").trim(),
           col_e_embarque: String(row[5] ?? "").trim(),
           col_f_lote: loteTextoVisible,
@@ -331,7 +374,7 @@ if (targetName === "CapturaFotos") {
           col_h_descripcion: String(row[8] ?? "").trim(),
           col_i_um: String(row[9] ?? "").trim(),
           col_j_stock: String(row[10] ?? "").trim(),
-          col_k_vencimiento: normalizarFechaExcel(row[11], "/"),
+          col_k_vencimiento: leerFechaExactaDDMMYYYY(wsOrigen, r, 11, row[11]),
           col_l_cod_discrepancia: String(row[13] ?? "").trim(),
           col_m_desc_problema: String(row[14] ?? "").trim(),
           col_p_tipo_medico: clasificacionP,
@@ -340,7 +383,6 @@ if (targetName === "CapturaFotos") {
           plantilla_generada: false
         });
       }
-
       mostrarCargando(
         "Cargando...",
         "Importando registros y clasificando en Columna P."
@@ -2106,7 +2148,7 @@ function renderizarHojasMaestras() {
           : hojasGeneradas[0];
         await activarPestana(destino);
 
-        mostrarCompletado(
+mostrarCompletado(
           "Consolidado Final Completado",
           `Hojas revisadas: ${hojasGeneradas.length}\nÍtems con fotos asignadas: ${itemsConFoto}\nÍtems sin foto (saltados): ${itemsSaltados}\nTotal de imágenes colocadas: ${fotosParaConsolidar.length}`
         );
@@ -2116,5 +2158,572 @@ function renderizarHojasMaestras() {
     });
   }
 
-  cargarMaestrosDesdeSupabase().then(() => cargarEstadoDesdeSupabase());
+  // =========================================================================
+  // 13. BOTÓN: CONSOLIDAR DATOS (APPEND SEGURO EN NO MEDICO / MEDICO SIN RS)
+  // =========================================================================
+  const RUTA_LOCAL_1 =
+    "C:\\Users\\AH2NAZZ\\3M\\DC ANDEAN REGION - 01. ACONDICIONADO\\09. REPORTES DE DISCREPANCIA\\CONSOLIDADO DE REPORTES DE DISCREPANCIAS 2026_LABELING.xlsx";
+  const RUTA_LOCAL_2 =
+    "C:\\Users\\AGHTBZZ\\OneDrive - 3M\\IV. PERU\\04. VAS\\01. ACONDICIONADO\\09. REPORTES DE DISCREPANCIA\\CONSOLIDADO DE REPORTES DE DISCREPANCIAS 2026_LABELING.xlsx";
+
+  const NS_EXCEL = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const NS_XML = "http://www.w3.org/XML/1998/namespace";
+  const NS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+  function obtenerMesActualEspanol() {
+    const meses = [
+      "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+      "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    ];
+    return meses[new Date().getMonth()];
+  }
+
+  function abrirDbHandleConsolidado() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("m3m_consolidado_handles", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("handles");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function guardarHandleConsolidado(handle) {
+    const db = await abrirDbHandleConsolidado();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("handles", "readwrite");
+      tx.objectStore("handles").put(handle, "archivo_consolidado_labeling");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function obtenerHandleConsolidadoGuardado() {
+    try {
+      const db = await abrirDbHandleConsolidado();
+      return await new Promise((resolve) => {
+        const tx = db.transaction("handles", "readonly");
+        const req = tx.objectStore("handles").get("archivo_consolidado_labeling");
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function obtenerArchivoDestinoConsolidado() {
+  if (!window.showOpenFilePicker) {
+    throw new Error(
+      "Tu navegador no soporta edición directa de archivos locales. Usa Chrome o Edge en PC."
+    );
+  }
+
+  let fileHandle = await obtenerHandleConsolidadoGuardado();
+  if (fileHandle) {
+    try {
+      let perm = await fileHandle.queryPermission({ mode: "readwrite" });
+      if (perm !== "granted") {
+        perm = await fileHandle.requestPermission({ mode: "readwrite" });
+      }
+      if (perm === "granted") {
+        // ⚠️ Se eliminó "await fileHandle.getFile();" (verificación descartada).
+        // queryPermission/requestPermission YA confirman que el handle sigue
+        // siendo válido, sin tocar el archivo. Llamar a getFile() aquí dejaba
+        // "cacheado" un estado que OneDrive invalidaba antes de la lectura
+        // real, provocando: "state cached in an interface object...".
+        return fileHandle;
+      }
+    } catch {
+      fileHandle = null;
+    }
+  }
+    const confirmarSeleccion = await mostrarConfirmacionConLogo(
+      "Vincular Consolidado 2026 (OneDrive / SharePoint)",
+      `Seleccione su archivo existente:\nCONSOLIDADO DE REPORTES DE DISCREPANCIAS 2026_LABELING.xlsx\n\n• Ruta 1 (AH2NAZZ): ${RUTA_LOCAL_1}\n• Ruta 2 (AGHTBZZ): ${RUTA_LOCAL_2}\n\nEl sistema agregará solo las filas nuevas al final sin borrar lo existente.`,
+      "Seleccionar Archivo"
+    );
+
+    if (!confirmarSeleccion) return null;
+
+    try {
+      const [pickedHandle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          {
+            description: "Excel Consolidado 3M (.xlsx)",
+            accept: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]
+            }
+          }
+        ]
+      });
+      await guardarHandleConsolidado(pickedHandle);
+      return pickedHandle;
+    } catch {
+      return null;
+    }
+  }
+
+  function colLetrasAIndice(colStr) {
+    let n = 0;
+    for (let i = 0; i < colStr.length; i++) {
+      n = n * 26 + (colStr.charCodeAt(i) - 64);
+    }
+    return n;
+  }
+
+  function limpiarTextoXml(valor) {
+    if (valor === null || valor === undefined) return "";
+    return String(valor).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  }
+
+  // Convierte "DD/MM/YYYY", "DD-MM-YYYY" o "YYYY-MM-DD" al número serial de fecha de Excel
+  function fechaASerialExcel(valor) {
+    const str = String(valor || "").trim();
+    if (!str || str === "-") return null;
+
+    let dd, mm, yyyy;
+    let m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) {
+      dd = parseInt(m[1], 10);
+      mm = parseInt(m[2], 10);
+      yyyy = parseInt(m[3], 10);
+    } else {
+      m = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+      if (m) {
+        yyyy = parseInt(m[1], 10);
+        mm = parseInt(m[2], 10);
+        dd = parseInt(m[3], 10);
+      } else {
+        return null;
+      }
+    }
+
+    const utcMs = Date.UTC(yyyy, mm - 1, dd);
+    if (isNaN(utcMs)) return null;
+    return Math.round((utcMs - Date.UTC(1899, 11, 30)) / 86400000);
+  }
+
+  function obtenerUltimaFilaDom(sheetData) {
+    let maxRow = 2; // Fila 1 título, Fila 2 encabezados
+    const rows = Array.from(sheetData.getElementsByTagNameNS(NS_EXCEL, "row"));
+    for (const row of rows) {
+      const rNum = parseInt(row.getAttribute("r"), 10);
+      if (isNaN(rNum)) continue;
+
+      const cells = Array.from(row.getElementsByTagNameNS(NS_EXCEL, "c"));
+      let tieneDato = false;
+      for (const c of cells) {
+        const ref = c.getAttribute("r") || "";
+        const colMatch = ref.match(/^([A-Z]+)/);
+        if (!colMatch) continue;
+        const colIdx = colLetrasAIndice(colMatch[1]);
+        if (colIdx > 13) continue; // Ignorar columnas N y O (fórmulas pre-cargadas)
+
+        const vNode = c.getElementsByTagNameNS(NS_EXCEL, "v")[0];
+        const tNode = c.getElementsByTagNameNS(NS_EXCEL, "t")[0];
+        if (
+          (vNode && vNode.textContent.trim() !== "") ||
+          (tNode && tNode.textContent.trim() !== "")
+        ) {
+          tieneDato = true;
+          break;
+        }
+      }
+      if (tieneDato && rNum > maxRow) {
+        maxRow = rNum;
+      }
+    }
+    return maxRow;
+  }
+
+  // Actualiza o crea UNA sola celda (A-M) manteniendo intactas las celdas N y O y el orden de columnas
+  function establecerCeldaEnFila(doc, rowEl, colLetra, rowNumber, valor, esNumero, styleFallback) {
+    const ns = doc.documentElement.namespaceURI || NS_EXCEL;
+    const ref = `${colLetra}${rowNumber}`;
+    const targetColIdx = colLetrasAIndice(colLetra);
+
+    const celdas = Array.from(rowEl.getElementsByTagNameNS(ns, "c"));
+    let cell = celdas.find((c) => c.getAttribute("r") === ref);
+
+    if (!cell) {
+      cell = doc.createElementNS(ns, "c");
+      cell.setAttribute("r", ref);
+
+      const siguiente = celdas.find((c) => {
+        const m = (c.getAttribute("r") || "").match(/^([A-Z]+)/);
+        return m && colLetrasAIndice(m[1]) > targetColIdx;
+      });
+      if (siguiente) {
+        rowEl.insertBefore(cell, siguiente);
+      } else {
+        rowEl.appendChild(cell);
+      }
+    }
+
+    // Heredar siempre el estilo de la fila anterior (mantiene DD/MM/AAAA en B y J)
+    if (styleFallback) {
+      cell.setAttribute("s", styleFallback);
+    }
+
+    // Limpiar solo el contenido de esta celda
+    while (cell.firstChild) {
+      cell.removeChild(cell.firstChild);
+    }
+    cell.removeAttribute("t");
+
+    if (valor === null || valor === undefined || String(valor).trim() === "") {
+      return;
+    }
+
+    if (esNumero && /^-?\d+(\.\d+)?$/.test(String(valor).trim())) {
+      const v = doc.createElementNS(ns, "v");
+      v.textContent = String(valor).trim();
+      cell.appendChild(v);
+    } else {
+      const texto = limpiarTextoXml(valor);
+      cell.setAttribute("t", "inlineStr");
+      const isNode = doc.createElementNS(ns, "is");
+      const tNode = doc.createElementNS(ns, "t");
+      if (/^\s|\s$/.test(texto)) {
+        tNode.setAttributeNS(NS_XML, "xml:space", "preserve");
+      }
+      tNode.textContent = texto;
+      isNode.appendChild(tNode);
+      cell.appendChild(isNode);
+    }
+  }
+
+  // Limpia el valor cacheado (#N/A) en N y O dejando intactas las fórmulas <f> para que Excel recalcule
+  function refrescarFormulasNO(doc, rowEl, rowNumber) {
+    const ns = doc.documentElement.namespaceURI || NS_EXCEL;
+    const celdas = Array.from(rowEl.getElementsByTagNameNS(ns, "c"));
+    ["N", "O"].forEach((col) => {
+      const cell = celdas.find((c) => c.getAttribute("r") === `${col}${rowNumber}`);
+      if (!cell) return;
+      if (cell.getAttribute("t") === "e" || cell.getAttribute("t") === "str") {
+        cell.removeAttribute("t");
+      }
+      const vNode = cell.getElementsByTagNameNS(ns, "v")[0];
+      if (vNode) cell.removeChild(vNode);
+    });
+  }
+
+  function actualizarFilaConsolidado(doc, sheetData, rowNumber, celdasConfig) {
+    const ns = doc.documentElement.namespaceURI || NS_EXCEL;
+    const rows = Array.from(sheetData.getElementsByTagNameNS(ns, "row"));
+
+    const prevRow = rows.find((r) => parseInt(r.getAttribute("r"), 10) === rowNumber - 1);
+    const estilosPrevios = {};
+    if (prevRow) {
+      Array.from(prevRow.getElementsByTagNameNS(ns, "c")).forEach((c) => {
+        const m = (c.getAttribute("r") || "").match(/^([A-Z]+)/);
+        if (m && c.getAttribute("s")) {
+          estilosPrevios[m[1]] = c.getAttribute("s");
+        }
+      });
+    }
+
+    let targetRow = rows.find((r) => parseInt(r.getAttribute("r"), 10) === rowNumber);
+    if (!targetRow) {
+      targetRow = doc.createElementNS(ns, "row");
+      targetRow.setAttribute("r", String(rowNumber));
+      const nextRow = rows.find((r) => parseInt(r.getAttribute("r"), 10) > rowNumber);
+      if (nextRow) {
+        sheetData.insertBefore(targetRow, nextRow);
+      } else {
+        sheetData.appendChild(targetRow);
+      }
+    }
+
+    // Escribir únicamente columnas A..M sin tocar las celdas N..O existentes
+    celdasConfig.forEach(({ col, val, esNumero }) => {
+      establecerCeldaEnFila(
+        doc,
+        targetRow,
+        col,
+        rowNumber,
+        val,
+        esNumero,
+        estilosPrevios[col] || null
+      );
+    });
+
+    refrescarFormulasNO(doc, targetRow, rowNumber);
+  }
+
+  function actualizarDimensionSegura(doc, sheetData, ultimaFilaEscrita) {
+    const ns = doc.documentElement.namespaceURI || NS_EXCEL;
+    const dimNode = doc.getElementsByTagNameNS(ns, "dimension")[0];
+    if (!dimNode) return;
+
+    const rows = Array.from(sheetData.getElementsByTagNameNS(ns, "row"));
+    let maxRowXml = ultimaFilaEscrita;
+    rows.forEach((r) => {
+      const n = parseInt(r.getAttribute("r"), 10);
+      if (!isNaN(n) && n > maxRowXml) maxRowXml = n;
+    });
+
+    const refActual = dimNode.getAttribute("ref") || "A1:O1";
+    const match = refActual.match(/^([A-Z]+\d+):([A-Z]+)(\d+)$/);
+    const inicio = match ? match[1] : "A1";
+    const colFin = match && colLetrasAIndice(match[2]) >= 15 ? match[2] : "O";
+    const filaFin = Math.max(match ? parseInt(match[3], 10) : 1, maxRowXml);
+
+    dimNode.setAttribute("ref", `${inicio}:${colFin}${filaFin}`);
+  }
+
+  async function eliminarCalcChain(zip) {
+    zip.remove("xl/calcChain.xml");
+
+    const ctFile = zip.file("[Content_Types].xml");
+    if (ctFile) {
+      const ctXml = await ctFile.async("string");
+      zip.file(
+        "[Content_Types].xml",
+        ctXml.replace(/<Override[^>]*calcChain\.xml[^>]*\/>/gi, "")
+      );
+    }
+
+    const relsFile = zip.file("xl/_rels/workbook.xml.rels");
+    if (relsFile) {
+      const relsXml = await relsFile.async("string");
+      zip.file(
+        "xl/_rels/workbook.xml.rels",
+        relsXml.replace(/<Relationship[^>]*calcChain\.xml[^>]*\/>/gi, "")
+      );
+    }
+  }
+
+  function obtenerEntradaZipSegura(zip, rutaBuscada) {
+    const normalizada = decodeURIComponent(String(rutaBuscada || ""))
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "")
+      .replace(/^\.\//, "");
+
+    // Resolver segmentos ".." (ej. "xl/../xl/worksheets/sheet1.xml")
+    const partes = [];
+    for (const seg of normalizada.split("/")) {
+      if (!seg || seg === ".") continue;
+      if (seg === "..") partes.pop();
+      else partes.push(seg);
+    }
+    const rutaLimpia = partes.join("/");
+
+    // 1) Búsqueda exacta
+    const exacto = zip.file(rutaLimpia);
+    if (exacto) return { file: exacto, rutaReal: rutaLimpia };
+
+    // 2) Búsqueda insensible a mayúsculas/minúsculas
+    const objetivoLower = rutaLimpia.toLowerCase();
+    const claveReal = Object.keys(zip.files).find(
+      (k) => k.toLowerCase() === objetivoLower
+    );
+    if (claveReal) {
+      return { file: zip.file(claveReal), rutaReal: claveReal };
+    }
+
+    return null;
+  }
+
+
+  
+  async function resolverRutaXmlHoja(zip, nombreHojaBuscado) {
+    const parser = new DOMParser();
+    const wbEntry = obtenerEntradaZipSegura(zip, "xl/workbook.xml");
+    const relsEntry = obtenerEntradaZipSegura(zip, "xl/_rels/workbook.xml.rels");
+
+    if (!wbEntry || !relsEntry) {
+      throw new Error("El archivo seleccionado no es un Excel (.xlsx) válido o está protegido/dañado.");
+    }
+
+    const wbXmlStr = await wbEntry.file.async("string");
+    const relsXmlStr = await relsEntry.file.async("string");
+
+    const wbDoc = parser.parseFromString(wbXmlStr, "application/xml");
+    const relsDoc = parser.parseFromString(relsXmlStr, "application/xml");
+
+    const sheets = Array.from(wbDoc.getElementsByTagNameNS(NS_EXCEL, "sheet"));
+    const objetivo = nombreHojaBuscado.trim().toUpperCase();
+
+    const sheetNode = sheets.find(
+      (s) => (s.getAttribute("name") || "").trim().toUpperCase() === objetivo
+    );
+    if (!sheetNode) {
+      throw new Error(`No se encontró la hoja "${nombreHojaBuscado}" en el archivo Consolidado.`);
+    }
+
+    const rId = sheetNode.getAttributeNS(NS_REL, "id") || sheetNode.getAttribute("r:id");
+    const rels = Array.from(relsDoc.getElementsByTagName("Relationship"));
+    const relNode = rels.find((r) => r.getAttribute("Id") === rId);
+    if (!relNode) {
+      throw new Error(`No se encontró la relación XML para la hoja "${nombreHojaBuscado}".`);
+    }
+
+    let target = String(relNode.getAttribute("Target") || "").replace(/\\/g, "/");
+    if (target.startsWith("/")) {
+      target = target.replace(/^\/+/, "");
+    } else if (!target.toLowerCase().startsWith("xl/")) {
+      target = "xl/" + target;
+    }
+
+    const sheetEntry = obtenerEntradaZipSegura(zip, target);
+    if (!sheetEntry) {
+      throw new Error(`No se encontró el XML interno "${target}" para la hoja "${nombreHojaBuscado}".`);
+    }
+
+    return {
+      rutaXml: sheetEntry.rutaReal,
+      nombreHojaReal: sheetNode.getAttribute("name")
+    };
+  }
+
+  if (btnConsolidarDatos) {
+    btnConsolidarDatos.addEventListener("click", async () => {
+      if (hojaRegistros.length === 0) {
+        return mostrarErrorEstado("Sin datos", "No hay registros cargados para consolidar.");
+      }
+
+      const faltanReportes = hojaRegistros.some(
+        (r) => String(r.col_e_embarque || "").trim() && !String(r.col_q_nro_reporte || "").trim()
+      );
+      if (faltanReportes) {
+        return mostrarErrorEstado(
+          "Falta N° de Reporte",
+          "Primero ejecute 'Generar Nro Reporte' antes de consolidar los datos."
+        );
+      }
+
+      try {
+        const fileHandle = await obtenerArchivoDestinoConsolidado();
+        if (!fileHandle) return;
+
+        mostrarCargando(
+          "Consolidando Datos...",
+          "Agregando filas nuevas en NO MEDICO y MEDICO SIN RS preservando fórmulas y formato..."
+        );
+
+        const file = await fileHandle.getFile();
+        const arrayBuffer = await file.arrayBuffer();
+        const zip = await JSZip.loadAsync(arrayBuffer);
+
+        const mesActual = obtenerMesActualEspanol();
+        const fechaHoy = fechaHoyDDMMYYYY();
+
+        const filasValidas = hojaRegistros.filter(
+          (r) => String(r.col_e_embarque || "").trim() !== ""
+        );
+
+        // Separar registros según la hoja destino real del libro
+        const gruposPorHoja = {
+          "NO MEDICO": filasValidas.filter(
+            (r) => String(r.col_p_tipo_medico || "").trim().toUpperCase() !== "MEDICO SIN RS"
+          ),
+          "MEDICO SIN RS": filasValidas.filter(
+            (r) => String(r.col_p_tipo_medico || "").trim().toUpperCase() === "MEDICO SIN RS"
+          )
+        };
+
+        const parser = new DOMParser();
+        const serializer = new XMLSerializer();
+        const resumen = [];
+
+        for (const [nombreHojaObjetivo, listaFilas] of Object.entries(gruposPorHoja)) {
+          if (listaFilas.length === 0) continue;
+
+          const { rutaXml, nombreHojaReal } = await resolverRutaXmlHoja(zip, nombreHojaObjetivo);
+          const sheetZipFile = zip.file(rutaXml);
+          if (!sheetZipFile) {
+            throw new Error(`No se pudo leer la hoja "${nombreHojaReal}" (${rutaXml}).`);
+          }
+          const sheetXmlStr = await sheetZipFile.async("string");
+          const sheetDoc = parser.parseFromString(sheetXmlStr, "application/xml");
+          const sheetData = sheetDoc.getElementsByTagNameNS(NS_EXCEL, "sheetData")[0];
+          if (!sheetData) throw new Error(`No se encontró <sheetData> en "${nombreHojaReal}".`);
+
+          let filaActual = obtenerUltimaFilaDom(sheetData);
+          const filaInicio = filaActual + 1;
+
+const normalizarFechaDDMMYYYY = (val) => {
+            const s = String(val || "").trim();
+            const iso = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+            if (iso) {
+              return `${iso[3].padStart(2, "0")}/${iso[2].padStart(2, "0")}/${iso[1]}`;
+            }
+            const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+            if (m) {
+              const p1 = parseInt(m[1], 10);
+              const p2 = parseInt(m[2], 10);
+              const yyyy = m[3].length === 2 ? `20${m[3]}` : m[3];
+              if (p2 > 12 && p1 <= 12) {
+                return `${String(p2).padStart(2, "0")}/${String(p1).padStart(2, "0")}/${yyyy}`;
+              }
+              return `${String(p1).padStart(2, "0")}/${String(p2).padStart(2, "0")}/${yyyy}`;
+            }
+            return s;
+          };
+
+          listaFilas.forEach((reg) => {
+            filaActual++;
+
+            const fechaTextoDDMMYYYY = normalizarFechaDDMMYYYY(reg.col_c_fecha || fechaHoy);
+            const serialVenc = fechaASerialExcel(reg.col_k_vencimiento);
+            const vencValido = typeof serialVenc === "number" && Number.isFinite(serialVenc);
+            const nroCorrelativo = String(reg.col_q_nro_reporte || "").trim().slice(0, 4);
+            const traspasoTxt = String(reg.col_d_traspaso || "").trim();
+            const stockTxt = String(reg.col_j_stock ?? "").trim().replace(",", ".");
+            const stockEsNum = stockTxt !== "" && Number.isFinite(Number(stockTxt));
+
+            const celdasConfig = [
+              { col: "A", val: mesActual, esNumero: false },
+              { col: "B", val: fechaTextoDDMMYYYY, esNumero: false },
+              { col: "C", val: nroCorrelativo, esNumero: false },
+              { col: "D", val: reg.col_e_embarque || "", esNumero: false },
+              { col: "E", val: reg.col_g_sku || "", esNumero: false },
+              { col: "F", val: reg.col_h_descripcion || "", esNumero: false },
+              { col: "G", val: reg.col_i_um || "", esNumero: false },
+              { col: "H", val: stockEsNum ? Number(stockTxt) : (reg.col_j_stock || ""), esNumero: stockEsNum },
+              { col: "I", val: reg.col_f_lote || "-", esNumero: false },
+              { col: "J", val: vencValido ? serialVenc : (reg.col_k_vencimiento || "-"), esNumero: vencValido },
+              { col: "K", val: traspasoTxt, esNumero: /^\d+$/.test(traspasoTxt) },
+              { col: "L", val: reg.col_l_cod_discrepancia || "", esNumero: false },
+              { col: "M", val: reg.col_m_desc_problema || "", esNumero: false }
+            ];
+
+            actualizarFilaConsolidado(sheetDoc, sheetData, filaActual, celdasConfig);
+          });
+          actualizarDimensionSegura(sheetDoc, sheetData, filaActual);
+          zip.file(rutaXml, serializer.serializeToString(sheetDoc));
+          resumen.push(`• ${nombreHojaReal}: ${listaFilas.length} fila(s) (filas ${filaInicio} a ${filaActual})`);
+        }
+
+        // Obligatorio: eliminar calcChain.xml para que Excel abra limpio y recalcule N y O
+        await eliminarCalcChain(zip);
+
+        const nuevoBlob = await zip.generateAsync({
+          type: "blob",
+          mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          compression: "DEFLATE"
+        });
+
+        const writable = await fileHandle.createWritable();
+        await writable.write(nuevoBlob);
+        await writable.close();
+
+        mostrarCompletado(
+          "Consolidado Actualizado",
+          `Se agregaron los registros correctamente sin alterar fórmulas:\n${resumen.join("\n")}`
+        );
+      } catch (err) {
+        mostrarErrorEstado("Error al consolidar datos", err.message);
+      }
+    });
+  }
+  // =========================================================================
+  // 14. INICIALIZACIÓN AL CARGAR LA PÁGINA
+  // =========================================================================
+  (async () => {
+    await cargarMaestrosDesdeSupabase();
+    await cargarEstadoDesdeSupabase();
+  })();
 });

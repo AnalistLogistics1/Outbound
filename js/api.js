@@ -1306,12 +1306,59 @@ await enviarAlertaCorreo(correos, `[EXTERNAL] Solicitud "${p.tipo_solicitud}" Re
             await db.storage.from("fotos-labeling").remove(pathsCaptura);
           }
 
-          // 3. Vaciar tablas operativas (no toca DB de correlativos ni Maestros)
+// 3. Vaciar tablas operativas (no toca DB de correlativos ni Maestros)
           await db.from("labeling_fotos").delete().neq("id", 0);
           await db.from("labeling_registros").delete().neq("id", 0);
           await db.from("discrepancias_labeling").delete().neq("id", 0);
 
           return { ok: true, deletedFotos: pathsHojas.length + pathsCaptura.length };
+        }
+
+        case "consolidarDatosLabeling": {
+          const { filas } = payload;
+          if (!Array.isArray(filas) || filas.length === 0) {
+            throw new Error("No hay filas válidas para consolidar.");
+          }
+
+          const user = JSON.parse(localStorage.getItem("authUser") || "{}");
+          const registrosInsertar = filas.map((f) => ({
+            ...f,
+            usuario_login: user.email || user.usuario || "",
+            nombre_usuario: user.nombre || "Usuario"
+          }));
+
+          // Insertar en lotes de 200 filas
+          for (let i = 0; i < registrosInsertar.length; i += 200) {
+            const lote = registrosInsertar.slice(i, i + 200);
+            const { error: insErr } = await db
+              .from("consolidado_discrepancias_labeling")
+              .insert(lote);
+            if (insErr) throw new Error(insErr.message);
+          }
+
+          // Recuperar todo el histórico acumulado para exportar el Excel consolidado completo
+          let historico = [];
+          let from = 0;
+          const step = 1000;
+          while (true) {
+            const { data, error: fetchErr } = await db
+              .from("consolidado_discrepancias_labeling")
+              .select("*")
+              .order("id", { ascending: true })
+              .range(from, from + step - 1);
+
+            if (fetchErr) throw new Error(fetchErr.message);
+            if (!data || data.length === 0) break;
+            historico = historico.concat(data);
+            if (data.length < step) break;
+            from += step;
+          }
+
+          return {
+            ok: true,
+            insertadas: registrosInsertar.length,
+            historico
+          };
         }
 
         default:

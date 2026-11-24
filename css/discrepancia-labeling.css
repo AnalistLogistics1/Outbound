@@ -131,6 +131,11 @@ body {
   border-color: #f59e0b;
 }
 
+.m3m-btn-consolidar-datos {
+  background: #ede9fe;
+  border-color: #8b5cf6;
+}
+
 .m3m-btn-reset {
   background: #fef2f2;
   border-color: #fca5a5;
